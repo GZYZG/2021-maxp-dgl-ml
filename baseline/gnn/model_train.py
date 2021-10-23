@@ -6,6 +6,7 @@
 """
 
 import os
+import sys
 import argparse
 import datetime as dt
 import numpy as np
@@ -15,6 +16,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.distributed as dist
 import torch.multiprocessing as mp
+from torch.utils.tensorboard import SummaryWriter
 
 import dgl
 from dgl.dataloading.neighbor import MultiLayerNeighborSampler
@@ -24,6 +26,25 @@ from models import GraphSageModel, GraphConvModel, GraphAttnModel
 from utils import load_dgl_graph, time_diff
 from model_utils import early_stopper, thread_wrapped_func
 
+import logging
+
+
+writer: SummaryWriter = None
+exp_dir: str = ""
+
+def set_logging(log_dir, log_file_name=""):
+    assert log_file_name
+    logging.basicConfig(filename=os.path.join(log_dir, log_file_name), level=logging.INFO, filemode='a',
+                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
+    if not any([h.stream is sys.stdout for h in logging.getLogger().handlers]):
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+        
+
+def set_summary_writer(log_dir, log_file_name=""):
+    assert log_file_name
+    global writer
+    writer = SummaryWriter(os.path.join(log_dir, log_file_name))
+    
 
 def load_subtensor(node_feats, labels, seeds, input_nodes, device):
     """
@@ -116,7 +137,7 @@ def cpu_train(graph_data,
             e_t1 = dt.datetime.now()
             h, m, s = time_diff(e_t1, start_t)
 
-            print('In epoch:{:03d}|batch:{}, loss:{:4f}, acc:{:4f}, time:{}h{}m{}s'.format(epoch,
+            logging.info('In epoch:{:03d}|batch:{}, loss:{:4f}, acc:{:4f}, time:{}h{}m{}s'.format(epoch,
                                                                                            step,
                                                                                            loss,
                                                                                            pred.detach(),
@@ -131,13 +152,14 @@ def gpu_train(proc_id, n_gpus, GPUS,
               hidden_dim, n_layers, n_classes, fanouts,
               batch_size=32, num_workers=4, epochs=100, message_queue=None,
               output_folder='./output'):
-
+    global writer
+    
     device_id = GPUS[proc_id]
-    print('Use GPU {} for training ......'.format(device_id))
+    logging.info('Use GPU {} for training ......'.format(device_id))
 
     # ------------------- 1. Prepare data and split for multiple GPUs ------------------- #
     start_t = dt.datetime.now()
-    print('Start graph building at: {}-{} {}:{}:{}'.format(start_t.month,
+    logging.info('Start graph building at: {}-{} {}:{}:{}'.format(start_t.month,
                                                            start_t.day,
                                                            start_t.hour,
                                                            start_t.minute,
@@ -159,7 +181,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
     
 
     sampler = MultiLayerNeighborSampler(fanouts)
-    print("Before train data loader")
+#     print("Before train data loader")
     train_dataloader = NodeDataLoader(graph,
                                       train_nid_per_gpu,
                                       sampler,
@@ -169,7 +191,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
                                       num_workers=num_workers,
                                       )
     tmp = dt.datetime.now()
-    print("Finish train data loader at :{}-{} {}:{}:{}".format(tmp.month,
+    logging.info("Finish train data loader at :{}-{} {}:{}:{}".format(tmp.month,
                                                            tmp.day,
                                                            tmp.hour,
                                                            tmp.minute,
@@ -184,7 +206,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
                                     num_workers=num_workers,
                                     )
     tmp = dt.datetime.now()
-    print("Finish val data loader at :{}-{} {}:{}:{}".format(tmp.month,
+    logging.info("Finish val data loader at :{}-{} {}:{}:{}".format(tmp.month,
                                                            tmp.day,
                                                            tmp.hour,
                                                            tmp.minute,
@@ -192,11 +214,11 @@ def gpu_train(proc_id, n_gpus, GPUS,
 
     e_t1 = dt.datetime.now()
     h, m, s = time_diff(e_t1, start_t)
-    print('Model built used: {:02d}h {:02d}m {:02}s'.format(h, m, s))
+    logging.info('Model built used: {:02d}h {:02d}m {:02}s'.format(h, m, s))
 
     # ------------------- 2. Build model for multiple GPUs ------------------------------ #
     start_t = dt.datetime.now()
-    print('Start Model building at: {}-{} {}:{}:{}'.format(start_t.month,
+    logging.info('Start Model building at: {}-{} {}:{}:{}'.format(start_t.month,
                                                            start_t.day,
                                                            start_t.hour,
                                                            start_t.minute,
@@ -230,7 +252,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
                                                       output_device=device_id)
     e_t1 = dt.datetime.now()
     h, m, s = time_diff(e_t1, start_t)
-    print('Model built used: {:02d}h {:02d}m {:02}s'.format(h, m, s))
+    logging.info('Model built used: {:02d}h {:02d}m {:02}s'.format(h, m, s))
 
     # ------------------- 3. Build loss function and optimizer -------------------------- #
     loss_fn = thnn.CrossEntropyLoss().to(device_id)
@@ -239,13 +261,15 @@ def gpu_train(proc_id, n_gpus, GPUS,
     earlystoper = early_stopper(patience=2, verbose=False)
 
     # ------------------- 4. Train model  ----------------------------------------------- #
-    print('Plan to train {} epoches \n'.format(epochs))
-
+    logging.info('Plan to train {} epoches \n'.format(epochs))
+    
+    global_step = 0
+    best_val_acc = -1
     for epoch in range(epochs):
 
         # mini-batch for training
         train_loss_list = []
-        # train_acc_list = []
+        train_acc_list = []
         model.train()
         for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
             # forward
@@ -261,12 +285,20 @@ def gpu_train(proc_id, n_gpus, GPUS,
 
             train_loss_list.append(train_loss.cpu().detach().numpy())
             tr_batch_pred = th.sum(th.argmax(train_batch_logits, dim=1) == batch_labels) / th.tensor(batch_labels.shape[0])
+            train_acc_list.extend((th.argmax(train_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
 
             if step % 10 == 0:
-                print('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
+                logging.info('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
                                                                                                 step,
                                                                                                 np.mean(train_loss_list),
                                                                                                 tr_batch_pred.detach()))
+            writer.add_scalar("step/loss", train_loss.cpu().detach().numpy(), global_step)
+            writer.add_scalar("step/acc", tr_batch_pred.detach(), global_step)
+            global_step += 1
+        
+        writer.add_scalar("epoch/loss", np.mean(train_loss_list), epoch)
+        writer.add_scalar("epoch/acc", np.mean(train_acc_list), epoch)
+        
 
         # mini-batch for validation
         val_loss_list = []
@@ -282,13 +314,24 @@ def gpu_train(proc_id, n_gpus, GPUS,
 
             val_loss_list.append(val_loss.detach().cpu().numpy())
             val_batch_pred = th.sum(th.argmax(val_batch_logits, dim=1) == batch_labels) / th.tensor(batch_labels.shape[0])
-
+            val_acc_list.extend((th.argmax(val_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
+            
             if step % 10 == 0:
-                print('In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_acc:{:.4f}'.format(epoch,
+                logging.info('In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_acc:{:.4f}'.format(epoch,
                                                                                             step,
                                                                                             np.mean(val_loss_list),
                                                                                             val_batch_pred.detach()))
-
+        writer.add_scalar("val_epoch/loss", np.mean(val_loss_list), epoch)
+        writer.add_scalar("val_epoch/acc", np.mean(val_acc_list), epoch)
+        
+        if np.mean(val_acc_list) > best_val_acc:
+            model_path = os.path.join(output_folder, f"model-best-val-acc-{np.mean(val_acc_list):.3}.pth")
+            logging.info(f"Saved model with best val acc to {model_path}.\t({best_val_acc} -> {np.mean(val_acc_list)}) .")
+            best_val_acc = np.mean(val_acc_list)
+            model_para_dict = model.state_dict()
+            th.save(model_para_dict, model_path)
+            
+        
         # put validation results into message queue and aggregate at device 0
         if n_gpus > 1 and message_queue != None:
             message_queue.put(val_loss_list)
@@ -325,6 +368,8 @@ def gpu_train(proc_id, n_gpus, GPUS,
     else:
         model_para_dict = model.state_dict()
         th.save(model_para_dict, model_path)
+    
+    logging.info(f"model saved to {model_path}")
 
 
 if __name__ == '__main__':
@@ -338,8 +383,11 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, required=True, default=1)
     parser.add_argument('--GPU', nargs='+', type=int, required=True)
     parser.add_argument('--num_workers_per_gpu', type=int, default=4)
-    parser.add_argument('--epochs', type=int, default=100)
+    parser.add_argument('--epochs', type=int, default=200)
     parser.add_argument('--out_path', type=str, required=True, help="Absolute path for saving model parameters")
+    t_year, t_month, t_day = dt.datetime.now().year, dt.datetime.now().month, dt.datetime.now().day
+#     parser.add_argument('--log_dir', type=str, default="./log", help="Path to save log file")
+    parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
     args = parser.parse_args()
 
     # parse arguments
@@ -353,18 +401,38 @@ if __name__ == '__main__':
     WORKERS = args.num_workers_per_gpu
     EPOCHS = args.epochs
     OUT_PATH = args.out_path
-
+    
+    exp_dir = os.path.join(OUT_PATH, args.log_name)  # 实验输出目录
+    if not os.path.exists(exp_dir):
+        os.mkdir(exp_dir)
+    
+    set_logging(exp_dir, "train-log") 
+    set_summary_writer(exp_dir, "train-tensorboard")
+    
+    logging.info(f"Experiments output will be saved in {exp_dir}.")
+    
     # output arguments for logging
-    print('Data path: {}'.format(BASE_PATH))
-    print('Used algorithm: {}'.format(MODEL_CHOICE))
-    print('Hidden dimensions: {}'.format(HID_DIM))
-    print('number of hidden layers: {}'.format(N_LAYERS))
-    print('Fanout list: {}'.format(FANOUTS))
-    print('Batch size: {}'.format(BATCH_SIZE))
-    print('GPU list: {}'.format(GPUS))
-    print('Number of workers per GPU: {}'.format(WORKERS))
-    print('Max number of epochs: {}'.format(EPOCHS))
-    print('Output path: {}'.format(OUT_PATH))
+#     print('Data path: {}'.format(BASE_PATH))
+#     print('Used algorithm: {}'.format(MODEL_CHOICE))
+#     print('Hidden dimensions: {}'.format(HID_DIM))
+#     print('number of hidden layers: {}'.format(N_LAYERS))
+#     print('Fanout list: {}'.format(FANOUTS))
+#     print('Batch size: {}'.format(BATCH_SIZE))
+#     print('GPU list: {}'.format(GPUS))
+#     print('Number of workers per GPU: {}'.format(WORKERS))
+#     print('Max number of epochs: {}'.format(EPOCHS))
+#     print('Output path: {}'.format(OUT_PATH))
+    
+    logging.info('Data path: {}'.format(BASE_PATH))
+    logging.info('Used algorithm: {}'.format(MODEL_CHOICE))
+    logging.info('Hidden dimensions: {}'.format(HID_DIM))
+    logging.info('number of hidden layers: {}'.format(N_LAYERS))
+    logging.info('Fanout list: {}'.format(FANOUTS))
+    logging.info('Batch size: {}'.format(BATCH_SIZE))
+    logging.info('GPU list: {}'.format(GPUS))
+    logging.info('Number of workers per GPU: {}'.format(WORKERS))
+    logging.info('Max number of epochs: {}'.format(EPOCHS))
+    logging.info('Output path: {}'.format(OUT_PATH))
 
     # Retrieve preprocessed data and add reverse edge and self-loop
     graph, labels, train_nid, val_nid, test_nid, node_feat = load_dgl_graph(BASE_PATH)
@@ -384,7 +452,7 @@ if __name__ == '__main__':
                   num_workers=WORKERS,
                   device=cpu_device,
                   epochs=EPOCHS,
-                  out_path=OUT_PATH)
+                  out_path=exp_dir)
     else:
         n_gpus = len(GPUS)
 
@@ -393,7 +461,7 @@ if __name__ == '__main__':
                       graph_data=(graph, labels, train_nid, val_nid, test_nid, node_feat),
                       gnn_model=MODEL_CHOICE, hidden_dim=HID_DIM, n_layers=N_LAYERS, n_classes=23,
                       fanouts=FANOUTS, batch_size=BATCH_SIZE, num_workers=WORKERS, epochs=EPOCHS,
-                      message_queue=None, output_folder=OUT_PATH)
+                      message_queue=None, output_folder=exp_dir)
         else:
             message_queue = mp.Queue()
             procs = []
@@ -403,7 +471,7 @@ if __name__ == '__main__':
                                      (graph, labels, train_nid, val_nid, test_nid, node_feat),
                                      MODEL_CHOICE, HID_DIM, N_LAYERS, 23,
                                      FANOUTS, BATCH_SIZE, WORKERS, EPOCHS,
-                                     message_queue, OUT_PATH))
+                                     message_queue, exp_dir))
                 p.start()
                 procs.append(p)
             for p in procs:
