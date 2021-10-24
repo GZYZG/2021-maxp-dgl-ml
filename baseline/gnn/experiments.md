@@ -62,16 +62,25 @@
 - 单机单卡训练
 - 生成的模型：model-best-val-acc-0.526.pth
 - 提交结果：
-    - 1
-        - 模型：model-best-val-acc-0.526.pth
-        - 文件：model-best-val-acc-0-1634991285.csv 
-        - 得分：47.55454
+    - 1 
+        - 模型：model-best-val-acc-0.523.pth
+        - 文件：model-best-val-acc-0-1635056614.csv
+        - 得分：47.42128
     - 2
         - 模型：model-best-val-acc-0.524.pth
         - 文件：model-best-val-acc-0-1634991837.csv
-        - 得分：
+        - 得分： 47.71031
+    - 3
+        - 模型：model-best-val-acc-0.525.pth
+        - 文件：model-best-val-acc-0-1635056287.csv
+        - 得分：47.68825
+    - 4
+        - 模型：model-best-val-acc-0.526.pth
+        - 文件：model-best-val-acc-0-1634991285.csv 
+        - 得分：47.55454   
 - 备注：
     1. 通过观察tensorboard的可视化结果，可以看出训练过程很不稳定，loss和acc震荡的很明显
-    2. 可能出现了过拟合
+    2. 出现了过拟合
+    3. 在第101个epoch保存的模型表现最好，之后开始出现过拟合
     
 
