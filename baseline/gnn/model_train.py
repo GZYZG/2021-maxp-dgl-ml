@@ -389,7 +389,9 @@ if __name__ == '__main__':
 #     parser.add_argument('--log_dir', type=str, default="./log", help="Path to save log file")
     parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
     args = parser.parse_args()
-
+    
+    
+    
     # parse arguments
     BASE_PATH = args.data_path
     MODEL_CHOICE = args.gnn_model
@@ -409,6 +411,7 @@ if __name__ == '__main__':
     set_logging(exp_dir, "train-log") 
     set_summary_writer(exp_dir, "train-tensorboard")
     
+    logging.info(' '.join(sys.argv))    
     logging.info(f"Experiments output will be saved in {exp_dir}.")
     
     # output arguments for logging
