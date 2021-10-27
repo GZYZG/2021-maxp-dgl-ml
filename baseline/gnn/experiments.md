@@ -114,15 +114,20 @@
 # 2021-10-25
 - cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 4096 --GPU 0 --epochs 400 --out_path ./output`
 - 单机单卡训练
+- 结果保存目录：./output/experiment-2021-10-25-21686
 - 提交结果：
     - 1
-        - 模型：model-best-val-acc-0.538.pth
-        - 文件：model-best-val-acc-0.538-1635212695.csv
-        - 得分：47.79900
+        - 模型：model-best-val-acc-0.533.pth
+        - 文件：model-best-val-acc-0.533-1635300695.csv
+        - 得分：47.25201
     - 2
         - 模型：model-best-val-acc-0.536.pth
         - 文件：model-best-val-acc-0.536-1635212941.csv
         - 得分：48.14024
+    - 3
+        - 模型：model-best-val-acc-0.538.pth
+        - 文件：model-best-val-acc-0.538-1635212695.csv
+        - 得分：47.79900
 
 - 备注：
     1. 训练过程不稳定
@@ -135,6 +140,10 @@
 - 结果保存目录：./output/experiment-2021-10-25-55761
 - 提交结果
     - 1
-        - 模型：
-        - 文件：
-        - 得分：
+        - 模型：model-best-val-acc-0.514.pth
+        - 文件：model-best-val-acc-0.514-1635301311.csv
+        - 得分：46.89095
+        
+- 备注
+    1. 训练过程很不稳定，相交其他两个模型更不稳定
+    2. 在训练集和验证集上的表现不如其他两种模型（`graphsage`和`graphconv`）
