@@ -9,6 +9,7 @@
 import torch.nn as thnn
 import torch.nn.functional as F
 import dgl.nn as dglnn
+import gc
 
 
 class GraphSageModel(thnn.Module):
@@ -98,6 +99,10 @@ class GraphConvModel(thnn.Module):
 
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
+            if l == 0:
+                del features
+            del block
+            gc.collect()
             if l != len(self.layers) - 1:
                 h = self.dropout(h)
 
