@@ -23,7 +23,7 @@ from dgl.dataloading.neighbor import MultiLayerNeighborSampler
 from dgl.dataloading.pytorch import NodeDataLoader
 
 from models import GraphSageModel, GraphConvModel, GraphAttnModel
-from utils import load_dgl_graph, time_diff
+from utils import load_dgl_graph, time_diff, train_val_split
 from model_utils import early_stopper, thread_wrapped_func
 
 import logging
@@ -390,8 +390,6 @@ if __name__ == '__main__':
     parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
     args = parser.parse_args()
     
-    
-    
     # parse arguments
     BASE_PATH = args.data_path
     MODEL_CHOICE = args.gnn_model
@@ -414,18 +412,7 @@ if __name__ == '__main__':
     logging.info(' '.join(sys.argv))    
     logging.info(f"Experiments output will be saved in {exp_dir}.")
     
-    # output arguments for logging
-#     print('Data path: {}'.format(BASE_PATH))
-#     print('Used algorithm: {}'.format(MODEL_CHOICE))
-#     print('Hidden dimensions: {}'.format(HID_DIM))
-#     print('number of hidden layers: {}'.format(N_LAYERS))
-#     print('Fanout list: {}'.format(FANOUTS))
-#     print('Batch size: {}'.format(BATCH_SIZE))
-#     print('GPU list: {}'.format(GPUS))
-#     print('Number of workers per GPU: {}'.format(WORKERS))
-#     print('Max number of epochs: {}'.format(EPOCHS))
-#     print('Output path: {}'.format(OUT_PATH))
-    
+    # output arguments for logging   
     logging.info('Data path: {}'.format(BASE_PATH))
     logging.info('Used algorithm: {}'.format(MODEL_CHOICE))
     logging.info('Hidden dimensions: {}'.format(HID_DIM))
@@ -439,6 +426,7 @@ if __name__ == '__main__':
 
     # Retrieve preprocessed data and add reverse edge and self-loop
     graph, labels, train_nid, val_nid, test_nid, node_feat = load_dgl_graph(BASE_PATH)
+    train_nid, val_nid = train_val_split(labels.numpy(), seed=444)
     graph = dgl.to_bidirected(graph, copy_ndata=True)
     graph = dgl.add_self_loop(graph)
 
