@@ -147,3 +147,150 @@
 - 备注
     1. 训练过程很不稳定，相交其他两个模型更不稳定
     2. 在训练集和验证集上的表现不如其他两种模型（`graphsage`和`graphconv`）
+
+---
+
+# 2021-10-27
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 8192 --GPU 0 --epochs 400 --out_path ./output`
+- 单机单卡训练
+- 结果保存目录：./output/experiment-2021-10-27-610
+- `batch_size=8192`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.541.pth
+        - 文件：model-best-val-acc-0.541-1635399989.csv
+        - 得分：48.11278
+    - 2 
+        - 模型：model-best-val-acc-0.54.pth
+        - 文件：model-best-val-acc-0.54-1635400182.csv
+        - 得分：48.09883
+    - 3
+        - 模型：model-best-val-acc-0.538.pth
+        - 文件：model-best-val-acc-0.538-1635400360.csv
+        - 得分：48.04165
+    - 4 
+        - 模型：model-best-val-acc-0.537.pth
+        - 文件：model-best-val-acc-0.537-1635504221.csv
+        - 得分：48.21813
+    - 5
+        - 模型：model-best-val-acc-0.536.pth
+        - 文件：model-best-val-acc-0.536-1635504407.csv
+        - 得分：47.88498
+- 备注
+    1. 增大了batch_size
+    2. 相较于`bs=4096`，准确度确实提高了
+---
+
+# 2021-10-29
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 2048 --GPU 0 --epochs 400 --out_path ./output`
+- 单机单卡训练
+- 结果保存目录：./output/experiment-2021-10-29-22556
+- `batch_size=2048`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.537.pth
+        - 文件：model-best-val-acc-0.537-1635564362.csv
+        - 得分：47.59326
+    - 2 
+        - 模型：model-best-val-acc-0.536.pth
+        - 文件：model-best-val-acc-0.536-1635567538.csv
+        - 得分：47.58696
+    - 3
+        - 模型：model-best-val-acc-0.534.pth
+        - 文件：model-best-val-acc-0.534-1635567785.csv
+        - 得分：47.74812
+        
+--- 
+
+# 2021-10-30
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 8192 --GPU 0 --epochs 300 --out_path ./output`
+- 单机单卡
+- **对特征进行了标准化**
+- 结果保存目录：./output/experiment-2021-10-30-72944
+- `batch_size=8192`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.545.pth
+        - 文件：model-best-val-acc-0.545-1635647916.csv
+        - 得分：29.12986
+    - 2
+        - 模型：model-best-val-acc-0.542.pth
+        - 文件：model-best-val-acc-0.542-1635648296.csv
+        - 得分：28.51850
+- 备注
+    1. 线下表现很好，但是线上效果很差
+    2. 400 epochs已经发生了过拟合现象
+    
+---
+
+# 2021-10-31
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 8192 --GPU 0 --epochs 300 --out_path ./output`
+- 单机单卡
+- **对特征进行了归一化**
+- 结果保存目录：./output/experiment-2021-10-31-24989
+- `batch_size=8192`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.425.pth
+        - 文件：model-best-val-acc-0.545-1635647916.csv
+        - 得分：25.71198
+- 备注
+    1. 注意改了.py文件后，在jupyter中要restart kernel才会生效！！！
+    
+--- 
+
+# 2021-10-31
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 64 --n_layers 2 --fanout 20,20 --batch_size 8192 --GPU 0 --epochs 300 --out_path ./output`
+- 单机单卡
+- **对特征进行了标准化**
+- 结果保存目录：./output/experiment-2021-10-31-42423
+- `batch_size=8192`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.547.pth
+        - 文件：model-best-val-acc-0.547-1635739515.csv
+        - 得分：48.46484
+    - 2
+        - 模型：model-best-val-acc-0.545.pth
+        - 文件：model-best-val-acc-0.545-1635827255.csv
+        - 得分：48.30141
+    - 3
+        - 模型：model-best-val-acc-0.543.pth
+        - 文件：model-best-val-acc-0.543-1635827448.csv
+        - 得分：48.37300
+    - 4 
+        - 模型：model-best-val-acc-0.539.pth
+        - 文件：model-best-val-acc-0.539-1635827596.csv
+        - 得分：48.29151
+    - 5
+        - 模型：model-best-val-acc-0.547.pth
+        - 文件：model-best-val-acc-0.547-adjusted-1635849382.csv
+        - 得分：47.80485
+- 备注
+    1. 使用了CAN对分类概率进行后处理，但是没有提升，反而下降了一点
+    
+--- 
+
+# 2021-11-03
+- cmd：`python3.8 -u model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 512 --GPU 0 --epochs 200 --out_path ./output --num_workers_per_gpu 1`
+- 结果保存目录：./output/experiment-2021-11-3-14969
+- 标准化后的特征
+- 单机单卡
+- `batch_size=512 fanout=10,10,10 hidden_dim=128 n_layers=3`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.551.pth
+        - 文件：model-best-val-acc-0.551-1635943575.csv
+        - 得分：48.14430
+    - 2
+        - 模型：model-best-val-acc-0.554.pth
+        - 文件：model-best-val-acc-0.554-1636035845.csv
+        - 得分：48.31582
+    - 3
+        - 模型：model-best-val-acc-0.553.pth
+        - 文件：model-best-val-acc-0.553-1636036129.csv
+        - 得分：48.13799
+- 备注
+    1. 增加层数后，对显存要求大大提高
+    2. 验证集上效果达到了最佳，但是线上不佳，可能是因为batch_size的原因
+    3. 就目前的情况来看不需要200 epochs
