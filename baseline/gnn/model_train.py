@@ -150,7 +150,7 @@ def cpu_train(graph_data,
 def gpu_train(proc_id, n_gpus, GPUS,
               graph_data, gnn_model,
               hidden_dim, n_layers, n_classes, fanouts,
-              batch_size=32, num_workers=4, epochs=100, message_queue=None,
+              batch_size=32, num_workers=4, epochs=100, accumulation=1, message_queue=None,
               output_folder='./output'):
     global writer
     
@@ -265,6 +265,10 @@ def gpu_train(proc_id, n_gpus, GPUS,
     
     global_step = 0
     best_val_acc = -1
+    
+    tmp_loss = []
+    tmp_pred = []
+    tmp_bs = []
     for epoch in range(epochs):
 
         # mini-batch for training
@@ -278,29 +282,56 @@ def gpu_train(proc_id, n_gpus, GPUS,
             # metric and loss
             train_batch_logits = model(blocks, batch_inputs)
             train_loss = loss_fn(train_batch_logits, batch_labels)
+            train_loss = train_loss / accumulation
+            
+            tmp_bs.append(batch_labels.shape[0])
+            tmp_loss.append(train_loss.cpu().detach().numpy())
+            tmp_pred.extend((th.argmax(train_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
+            
             # backward
-            optimizer.zero_grad()
             train_loss.backward()
-            optimizer.step()
+            if (step + 1) % accumulation == 0 or (step+1) == len(train_dataloader):
+                optimizer.step()
+                optimizer.zero_grad()
+                
+                step_loss = sum([e1 * e2 * accumulation for e1, e2 in zip(tmp_bs, tmp_loss)]) / sum(tmp_bs)
+                step_acc = sum(tmp_pred) / len(tmp_pred)
+                
+                tmp_bs.clear()
+                tmp_loss.clear()
+                tmp_pred.clear()
+                
+                train_loss_list.append(step_loss)
+                train_acc_list.extend(tmp_pred)
+                
+                if (step+1) % (accumulation * 10) == 0:
+                    logging.info('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
+                                                                                                    (step+1) // (accumulation),
+                                                                                                    step_loss,
+                                                                                                    step_acc))
+                
+                writer.add_scalar("step/loss", step_loss, global_step)
+                writer.add_scalar("step/acc", step_acc, global_step)
+                global_step += 1       
 
-            train_loss_list.append(train_loss.cpu().detach().numpy())
-            tr_batch_pred = th.sum(th.argmax(train_batch_logits, dim=1) == batch_labels) / th.tensor(batch_labels.shape[0])
-            train_acc_list.extend((th.argmax(train_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
+#             train_loss_list.append(train_loss.cpu().detach().numpy())
+#             tr_batch_pred = th.sum(th.argmax(train_batch_logits, dim=1) == batch_labels) / th.tensor(batch_labels.shape[0])
+#             train_acc_list.extend((th.argmax(train_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
 
-            if step % 10 == 0:
-                logging.info('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
-                                                                                                step,
-                                                                                                np.mean(train_loss_list),
-                                                                                                tr_batch_pred.detach()))
-            writer.add_scalar("step/loss", train_loss.cpu().detach().numpy(), global_step)
-            writer.add_scalar("step/acc", tr_batch_pred.detach(), global_step)
-            global_step += 1
+#             if step % 10 == 0:
+#                 logging.info('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
+#                                                                                                 step,
+#                                                                                                 np.mean(train_loss_list),
+#                                                                                                 tr_batch_pred.detach()))
+#             writer.add_scalar("step/loss", train_loss.cpu().detach().numpy(), global_step)
+#             writer.add_scalar("step/acc", tr_batch_pred.detach(), global_step)
+#             global_step += 1
         
         writer.add_scalar("epoch/loss", np.mean(train_loss_list), epoch)
         writer.add_scalar("epoch/acc", np.mean(train_acc_list), epoch)
         
 
-        # mini-batch for validation
+        # mini-batch for validation 每训练完一个epoch就验证一次
         val_loss_list = []
         val_acc_list = []
         model.eval()
@@ -324,8 +355,8 @@ def gpu_train(proc_id, n_gpus, GPUS,
         writer.add_scalar("val_epoch/loss", np.mean(val_loss_list), epoch)
         writer.add_scalar("val_epoch/acc", np.mean(val_acc_list), epoch)
         
-        if np.mean(val_acc_list) > best_val_acc:
-            model_path = os.path.join(output_folder, f"model-best-val-acc-{np.mean(val_acc_list):.3}.pth")
+        if np.mean(val_acc_list) - best_val_acc >= 0.00001:
+            model_path = os.path.join(output_folder, f"model-best-val-acc-{np.mean(val_acc_list):.5}.pth")
             logging.info(f"Saved model with best val acc to {model_path}.\t({best_val_acc} -> {np.mean(val_acc_list)}) .")
             best_val_acc = np.mean(val_acc_list)
             model_para_dict = model.state_dict()
@@ -388,6 +419,7 @@ if __name__ == '__main__':
     t_year, t_month, t_day = dt.datetime.now().year, dt.datetime.now().month, dt.datetime.now().day
 #     parser.add_argument('--log_dir', type=str, default="./log", help="Path to save log file")
     parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
+    parser.add_argument('--accumulation', type=int, default=1, help="accumulation gradient")
     args = parser.parse_args()
     
     # parse arguments
@@ -401,6 +433,7 @@ if __name__ == '__main__':
     WORKERS = args.num_workers_per_gpu
     EPOCHS = args.epochs
     OUT_PATH = args.out_path
+    ACCUMULATION = args.accumulation
     
     exp_dir = os.path.join(OUT_PATH, args.log_name)  # 实验输出目录
     if not os.path.exists(exp_dir):
@@ -422,6 +455,7 @@ if __name__ == '__main__':
     logging.info('GPU list: {}'.format(GPUS))
     logging.info('Number of workers per GPU: {}'.format(WORKERS))
     logging.info('Max number of epochs: {}'.format(EPOCHS))
+    logging.info('Accumulation step: {}'.format(ACCUMULATION))
     logging.info('Output path: {}'.format(OUT_PATH))
 
     # Retrieve preprocessed data and add reverse edge and self-loop
@@ -451,7 +485,7 @@ if __name__ == '__main__':
             gpu_train(0, n_gpus, GPUS,
                       graph_data=(graph, labels, train_nid, val_nid, test_nid, node_feat),
                       gnn_model=MODEL_CHOICE, hidden_dim=HID_DIM, n_layers=N_LAYERS, n_classes=23,
-                      fanouts=FANOUTS, batch_size=BATCH_SIZE, num_workers=WORKERS, epochs=EPOCHS,
+                      fanouts=FANOUTS, batch_size=BATCH_SIZE, num_workers=WORKERS, epochs=EPOCHS, accumulation=ACCUMULATION,
                       message_queue=None, output_folder=exp_dir)
         else:
             message_queue = mp.Queue()
@@ -461,7 +495,7 @@ if __name__ == '__main__':
                                args=(proc_id, n_gpus, GPUS,
                                      (graph, labels, train_nid, val_nid, test_nid, node_feat),
                                      MODEL_CHOICE, HID_DIM, N_LAYERS, 23,
-                                     FANOUTS, BATCH_SIZE, WORKERS, EPOCHS,
+                                     FANOUTS, BATCH_SIZE, WORKERS, EPOCHS, ACCUMULATION,
                                      message_queue, exp_dir))
                 p.start()
                 procs.append(p)
