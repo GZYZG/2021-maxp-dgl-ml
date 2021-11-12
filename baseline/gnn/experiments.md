@@ -294,3 +294,79 @@
     1. 增加层数后，对显存要求大大提高
     2. 验证集上效果达到了最佳，但是线上不佳，可能是因为batch_size的原因
     3. 就目前的情况来看不需要200 epochs
+    
+--- 
+
+# 2021-11-05 
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 0 --epochs 150 --out_path ./output --num_workers_per_gpu 1`
+- 结果保存目录：experiment-2021-11-5-32276
+- 标准化特征
+- 单机单卡
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.567.csv
+        - 文件：model-best-val-acc-0.567-1636100359.csv
+        - 得分：49.85054
+    - 2
+        - 模型：model-best-val-acc-0.566.pth
+        - 文件：model-best-val-acc-0.566-1636100980.csv
+        - 得分：49.71773
+    - 3
+        - 模型：model-best-val-acc-0.561.pth
+        - 文件：model-best-val-acc-0.561-1636101319.csv
+        - 得分：49.27474
+- 备注
+    1. 增大bs后效果上涨很明显，达到了新的最佳
+    2. bs=4096基本要消耗完一张3090的显存，继续增大bs可能要使用累计梯度
+    3. 训练过程中在第105 epoch掉线了，应该还处于欠拟合状态
+    
+---
+
+# 2021-11-05 
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 0 --epochs 200 --out_path ./output --num_workers_per_gpu 1`
+- 结果保存目录：experiment-2021-11-5-57609
+- 标准化特征
+- 单机单卡
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.568.pth
+        - 文件：model-best-val-acc-0.568-1636165180.csv
+        - 得分：49.89015
+    - 2
+        - 模型：model-best-val-acc-0.566.pth
+        - 文件：model-best-val-acc-0.566-1636165496.csv
+        - 得分：49.73664
+    - 3
+        - 模型：model-best-val-acc-0.561.pth
+        - 文件：
+        - 得分：
+- 备注
+    1. 增大bs后效果上涨很明显，达到了新的最佳
+    2. 训练过程中在172 epoch掉线了，可能还处于欠拟合状态
+    
+--- 
+
+# 2021-11-06
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 0 --epochs 200 --out_path ./output --num_workers_per_gpu 1`
+- 结果保存目录：experiment-2021-11-6-25770
+- 标准化特征
+- 单机单卡
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3 epoch=200`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.569.pth
+        - 文件：model-best-val-acc-0.569-1636351757.csv
+        - 得分：49.60248
+    - 2
+        - 模型：model-best-val-acc-0.567.pth
+        - 文件：model-best-val-acc-0.567-1636352000.csv
+        - 得分：49.54800.
+    - 3
+        - 模型：model-best-val-acc-0.565.pth
+        - 文件：model-best-val-acc-0.565-1636352356.csv
+        - 得分：49.26843
+- 备注
+    1. 200 epoch训练完，未掉线
+    2. 从线上提交结果来看，还未出现过拟合
