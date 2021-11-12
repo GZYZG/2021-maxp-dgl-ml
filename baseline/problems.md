@@ -38,3 +38,20 @@
 - 描述：
 > 在三种baseline模型中，graphattn在训练集上的最高准确度是baseline中最低的，在验证集上也是如此
 
+---
+
+## 3. 对预测概率的后处理
+- 描述
+>使用模型计算测试集的概率后，通过一些策略/方法对概率进行矫正
+- 方法：
+1. CAN
+>参考论文[When in Doubt: Improving Classification Performance with Alternating Normalization](https://arxiv.org/abs/2109.13449)。对预测后的概率进行矫正，但是耗时太长，实验了一次后发现效果并不好，ACC反而下降了。
+
+---
+
+## 4. GPU显存不足
+- 描述
+>由于数据集中的引文网络较大，涉及到的模型参数较多，当模型复杂、batch_size增大后容易出现显存不足的问题
+- 方法：
+1. 累计梯度
+>训练时使用较小的batch_size，但是更新梯度时每隔几个batch更新一次
