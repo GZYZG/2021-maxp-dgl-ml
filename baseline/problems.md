@@ -46,6 +46,8 @@
 - 方法：
 1. CAN
 >参考论文[When in Doubt: Improving Classification Performance with Alternating Normalization](https://arxiv.org/abs/2109.13449)。对预测后的概率进行矫正，但是耗时太长，实验了一次后发现效果并不好，ACC反而下降了。
+2. 结点类别与其邻居结点类别分布的关系
+>
 
 ---
 
@@ -54,4 +56,5 @@
 >由于数据集中的引文网络较大，涉及到的模型参数较多，当模型复杂、batch_size增大后容易出现显存不足的问题
 - 方法：
 1. 累计梯度
->训练时使用较小的batch_size，但是更新梯度时每隔几个batch更新一次
+>训练时使用较小的batch_size，但是更新梯度时每隔几个batch更新一次。经过实验，`batch_size(4096)` $\times$ `accumulation(2)`达到了新的最佳效果。  
+>但累计梯度后的batch_size并不完全等价于直接使用该batch_size，分多次采样得到的子图并不等价。
