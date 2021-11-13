@@ -362,7 +362,7 @@
     - 2
         - 模型：model-best-val-acc-0.567.pth
         - 文件：model-best-val-acc-0.567-1636352000.csv
-        - 得分：49.54800.
+        - 得分：49.54800
     - 3
         - 模型：model-best-val-acc-0.565.pth
         - 文件：model-best-val-acc-0.565-1636352356.csv
@@ -370,3 +370,29 @@
 - 备注
     1. 200 epoch训练完，未掉线
     2. 从线上提交结果来看，还未出现过拟合
+
+---
+
+# 2021-11-12
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 0 --epochs 250 --out_path ./output --num_workers_per_gpu 1 --accumulation 2`
+- 结果保存目录：experiment-2021-11-12-50568
+- 标准化特征
+- 单机单卡
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3 epoch=250 accumulation=2`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57233.pth
+        - 文件：model-best-val-acc-0.57233-1636766034.csv
+        - 得分：50.02071
+    - 2
+        - 模型：model-best-val-acc-0.57153.pth
+        - 文件：model-best-val-acc-0.57153-1636766678.csv
+        - 得分：50.11795
+    - 3
+        - 模型：model-best-val-acc-0.57114.pth
+        - 文件：model-best-val-acc-0.57114-1636766978.csv
+        - 得分：50.21384
+- 备注
+    1. 使用了累计梯度，等价于`batch_size=8192`
+    2. 达到了新的最好效果
+    3. `epoch=250`时出现了过拟合现象
