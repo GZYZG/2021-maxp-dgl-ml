@@ -392,7 +392,106 @@
         - 模型：model-best-val-acc-0.57114.pth
         - 文件：model-best-val-acc-0.57114-1636766978.csv
         - 得分：50.21384
+    - 4
+        - 模型：model-best-val-acc-0.5706.pth
+        - 文件：model-best-val-acc-0.5706-1636860210.csv
+        - 得分：49.78526
 - 备注
     1. 使用了累计梯度，等价于`batch_size=8192`
     2. 达到了新的最好效果
-    3. `epoch=250`时出现了过拟合现象
+    3. `epoch=250`时出现了过拟合现象，大约在`epoch=160`处达到最佳效果
+    
+--- 
+
+## 2021-11-13
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 1 --epochs 250 --out_path ./output --num_workers_per_gpu 1 --accumulation 2`
+- 结果保存目录：experiment-2021-11-13-36332
+- 标准化特征
+- 单机单卡
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3 epoch=250 accumulation=2`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57149.pth
+        - 文件：model-best-val-acc-0.57149-1636863643.csv
+        - 得分：49.85999
+    - 2
+        - 模型：model-best-val-acc-0.57126.pth
+        - 文件：model-best-val-acc-0.57126-1636864366.csv
+        - 得分：49.95993
+- 备注
+    1. 出现过拟合现象
+    2. 效果可能受到数据分割的影响
+
+---
+
+## 2021-11-14
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 10,10,10 --batch_size 4096 --GPU 1 --epochs 250 --out_path ./output --num_workers_per_gpu 1 --accumulation 2 --class_weights`
+- 结果保存目录：experiment-2021-11-14-93626
+- 标准化特征
+- 单机单卡
+- 在交叉熵损失函数中引入了类别权重
+- `batch_size=4096 fanout=10,10,10 hidden_dim=128 n_layers=3 epoch=250 accumulation=2 --class_weights`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57217.pth
+        - 文件：model-best-val-acc-0.57217-1636940295.csv
+        - 得分：49.85459
+    - 2
+        - 模型：model-best-val-acc-0.57178.pth
+        - 文件：model-best-val-acc-0.57178-1636941621.csv
+        - 得分：49.83928
+- 备注
+    1. 引入类别权重后，效果并不好，线上得分反而下降了
+    
+---
+
+## 2021-11-15
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 20,20,20 --batch_size 2048 --GPU 1 --epochs 200 --out_path ./output --num_workers_per_gpu 1 --accumulation 4`
+- 结果保存目录：experiment-2021-11-15-44901
+- 标准化特征
+- 单机单卡
+- `batch_size=2048 fanout=20,20,20 hidden_dim=128 n_layers=3 epoch=200 accumulation=4`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57297.pth
+        - 文件：model-best-val-acc-0.57297-1636982327.csv
+        - 得分：49.59122
+    - 2
+        - 模型：model-best-val-acc-0.57366.pth
+        - 文件：model-best-val-acc-0.57366-1637051652.csv
+        - 得分：49.51874
+    - 3
+        - 模型：model-best-val-acc-0.57488.pth
+        - 文件：model-best-val-acc-0.57488-1637028153.csv
+        - 得分：49.84018
+    - 4 
+        - 模型：model-best-val-acc-0.57527.pth
+        - 文件：model-best-val-acc-0.57527-1637063278.csv
+        - 得分：49.54305
+- 备注
+    1. 线下效果达到了最优，但是线上分数较低，差距很大
+    2. 出现了过拟合现象，大概在100~120 个epoch时达到最好的验证效果
+    
+---
+
+## 2021-11-16
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 128 --n_layers 3 --fanout 20,20,20 --batch_size 2048 --GPU 1 --epochs 150 --out_path ./output --num_workers_per_gpu 1 --accumulation 4`
+- 结果保存目录：experiment-2021-11-16-20495
+- 标准化特征
+- 单机单卡
+- `batch_size=2048 fanout=20,20,20 hidden_dim=128 n_layers=3 epoch=200 accumulation=4`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57395.pth
+        - 文件：model-best-val-acc-0.57395-1637149332.csv
+        - 得分：49.78030
+    - 2 
+        - 模型：model-best-val-acc-0.57238.pth
+        - 文件：model-best-val-acc-0.57238-1637152101.csv
+        - 得分：49.61733
+    - 3 
+        - 模型：model-best-val-acc-0.5718.pth
+        - 文件：model-best-val-acc-0.5718-1637153057.csv
+        - 得分：49.64164
+- 备注
+    1. 增加邻居采样个数效果并不佳
