@@ -151,6 +151,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
               graph_data, gnn_model,
               hidden_dim, n_layers, n_classes, fanouts,
               batch_size=32, num_workers=4, epochs=100, accumulation=1, message_queue=None,
+              weights=None,
               output_folder='./output'):
     global writer
     
@@ -255,7 +256,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
     logging.info('Model built used: {:02d}h {:02d}m {:02}s'.format(h, m, s))
 
     # ------------------- 3. Build loss function and optimizer -------------------------- #
-    loss_fn = thnn.CrossEntropyLoss().to(device_id)
+    loss_fn = thnn.CrossEntropyLoss(weight=weights).to(device_id)
     optimizer = optim.Adam(model.parameters(), lr=0.004, weight_decay=5e-4)
 
     earlystoper = early_stopper(patience=2, verbose=False)
@@ -408,7 +409,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_path', type=str, help="Path of saved processed data files.")
     parser.add_argument('--gnn_model', type=str, choices=['graphsage', 'graphconv', 'graphattn'],
                         required=True, default='graphsage')
-    parser.add_argument('--hidden_dim', type=int, required=True)
+    parser.add_argument('--hidden_dim', nargs='+', type=int, required=True)
     parser.add_argument('--n_layers', type=int, default=2)
     parser.add_argument("--fanout", type=str, required=True, help="fanout numbers", default='20,20')
     parser.add_argument('--batch_size', type=int, required=True, default=1)
@@ -420,6 +421,7 @@ if __name__ == '__main__':
 #     parser.add_argument('--log_dir', type=str, default="./log", help="Path to save log file")
     parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
     parser.add_argument('--accumulation', type=int, default=1, help="accumulation gradient")
+    parser.add_argument('--class_weights', action='store_true', help="Use class weights or not.")
     args = parser.parse_args()
     
     # parse arguments
@@ -434,6 +436,7 @@ if __name__ == '__main__':
     EPOCHS = args.epochs
     OUT_PATH = args.out_path
     ACCUMULATION = args.accumulation
+    CLASS_WEIGHTS = args.class_weights
     
     exp_dir = os.path.join(OUT_PATH, args.log_name)  # 实验输出目录
     if not os.path.exists(exp_dir):
@@ -456,6 +459,7 @@ if __name__ == '__main__':
     logging.info('Number of workers per GPU: {}'.format(WORKERS))
     logging.info('Max number of epochs: {}'.format(EPOCHS))
     logging.info('Accumulation step: {}'.format(ACCUMULATION))
+    logging.info('Class weights: {}'.format(CLASS_WEIGHTS))
     logging.info('Output path: {}'.format(OUT_PATH))
 
     # Retrieve preprocessed data and add reverse edge and self-loop
@@ -463,6 +467,13 @@ if __name__ == '__main__':
     train_nid, val_nid = train_val_split(labels.numpy(), seed=444)
     graph = dgl.to_bidirected(graph, copy_ndata=True)
     graph = dgl.add_self_loop(graph)
+    
+    # 类被权重
+    weights = th.Tensor([2.39668255, 1.01738769, 0.16509785, 0.16509785, 1.46418911,
+       1.73149039, 1.49858725, 0.87378317, 1.92708851, 1.89962726,
+       1.73400088, 1.27971203, 0.6062837 , 0.1768355 , 2.06805041,
+       1.3066888 , 2.02217888, 1.7373482 , 1.91354507, 1.99570861,
+       1.91066021, 1.58436238, 2.16675236])
 
     # call train with CPU, one GPU, or multiple GPUs
     if GPUS[0] < 0:
@@ -486,7 +497,7 @@ if __name__ == '__main__':
                       graph_data=(graph, labels, train_nid, val_nid, test_nid, node_feat),
                       gnn_model=MODEL_CHOICE, hidden_dim=HID_DIM, n_layers=N_LAYERS, n_classes=23,
                       fanouts=FANOUTS, batch_size=BATCH_SIZE, num_workers=WORKERS, epochs=EPOCHS, accumulation=ACCUMULATION,
-                      message_queue=None, output_folder=exp_dir)
+                      message_queue=None, weights=weights if CLASS_WEIGHTS else None, output_folder=exp_dir)
         else:
             message_queue = mp.Queue()
             procs = []
@@ -496,7 +507,7 @@ if __name__ == '__main__':
                                      (graph, labels, train_nid, val_nid, test_nid, node_feat),
                                      MODEL_CHOICE, HID_DIM, N_LAYERS, 23,
                                      FANOUTS, BATCH_SIZE, WORKERS, EPOCHS, ACCUMULATION,
-                                     message_queue, exp_dir))
+                                     message_queue, weights if CLASS_WEIGHTS else None, exp_dir))
                 p.start()
                 procs.append(p)
             for p in procs:

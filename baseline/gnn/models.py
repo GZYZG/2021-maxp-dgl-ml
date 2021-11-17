@@ -78,21 +78,29 @@ class GraphConvModel(thnn.Module):
         self.dropout = thnn.Dropout(dropout)
 
         self.layers = thnn.ModuleList()
-
+    
+        hidden_dim.insert(0, in_feats)
+        hidden_dim.append(self.n_classes)
         # build multiple layers
-        self.layers.append(dglnn.GraphConv(in_feats=self.in_feats,
-                                           out_feats=self.hidden_dim,
-                                           norm=self.norm,
-                                           activation=self.activation,))
-        for l in range(1, (self.n_layers - 1)):
-            self.layers.append(dglnn.GraphConv(in_feats=self.hidden_dim,
-                                               out_feats=self.hidden_dim,
+        for l in range(len(hidden_dim)-1):
+            self.layers.append(dglnn.GraphConv(in_feats=hidden_dim[l], 
+                                               out_feats=hidden_dim[l+1],
                                                norm=self.norm,
                                                activation=self.activation))
-        self.layers.append(dglnn.GraphConv(in_feats=self.hidden_dim,
-                                           out_feats=self.n_classes,
-                                           norm=self.norm,
-                                           activation=self.activation))
+            
+#         self.layers.append(dglnn.GraphConv(in_feats=self.in_feats,
+#                                            out_feats=self.hidden_dim,
+#                                            norm=self.norm,
+#                                            activation=self.activation,))
+#         for l in range(1, (self.n_layers - 1)):
+#             self.layers.append(dglnn.GraphConv(in_feats=self.hidden_dim,
+#                                                out_feats=self.hidden_dim,
+#                                                norm=self.norm,
+#                                                activation=self.activation))
+#         self.layers.append(dglnn.GraphConv(in_feats=self.hidden_dim,
+#                                            out_feats=self.n_classes,
+#                                            norm=self.norm,
+#                                            activation=self.activation))
 
     def forward(self, blocks, features):
         h = features
