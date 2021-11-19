@@ -24,7 +24,7 @@ from dgl.dataloading.pytorch import NodeDataLoader
 
 from models import GraphSageModel, GraphConvModel, GraphAttnModel
 from utils import load_dgl_graph, time_diff, train_val_split
-from model_utils import early_stopper, thread_wrapped_func
+from model_utils import early_stopper, thread_wrapped_func, l1_regularization
 
 import logging
 
@@ -284,6 +284,8 @@ def gpu_train(proc_id, n_gpus, GPUS,
             train_batch_logits = model(blocks, batch_inputs)
             train_loss = loss_fn(train_batch_logits, batch_labels)
             train_loss = train_loss / accumulation
+            
+            train_loss += .5 * l1_regularization(model)
             
             tmp_bs.append(batch_labels.shape[0])
             tmp_loss.append(train_loss.cpu().detach().numpy())
