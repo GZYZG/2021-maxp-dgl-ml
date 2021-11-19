@@ -5,6 +5,7 @@
     utilities file for Pytorch models
 """
 
+import torch as th
 from functools import wraps
 import traceback
 from _thread import start_new_thread
@@ -72,3 +73,20 @@ def thread_wrapped_func(func):
             assert isinstance(exception, Exception)
             raise exception.__class__(trace)
     return decorated_function
+
+
+def l1_regularization(model):
+    """参数的L1 正则化"""
+    def prod(x):
+        if len(x) == 0:
+            return None
+        elif len(x) == 1:
+            return x[0]
+        else:
+            return x[0] * prod(x[1:])
+    regularization_loss = 0
+    n = 0
+    for param in model.parameters():
+        regularization_loss += th.sum(abs(param))
+        n += prod(param.shape)
+    return regularization_loss / n
