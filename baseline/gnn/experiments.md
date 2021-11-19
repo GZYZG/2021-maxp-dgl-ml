@@ -495,3 +495,50 @@
         - 得分：49.64164
 - 备注
     1. 增加邻居采样个数效果并不佳
+
+---
+
+## 2021-11-17
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphconv --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 2048 --GPU 1 --epochs 150 --out_path ./output --num_workers_per_gpu 1 --accumulation 4`
+- 结果保存目录：experiment-2021-11-16-20495
+- 标准化特征
+- 单机单卡
+- `batch_size=2048 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=4`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.57191.pth
+        - 文件：model-best-val-acc-0.57191-1637211513.csv
+        - 得分：49.63354
+    - 2
+        - 模型：model-best-val-acc-0.5706.pth
+        - 文件：model-best-val-acc-0.5706-1637213746.csv
+        - 得分：49.51109
+- 备注
+    1. 修改了隐层的大小
+    
+---
+
+## 2021-11-18
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphsage --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 2048 --GPU 1 --epochs 150 --out_path ./output --num_workers_per_gpu 1 --accumulation 4`
+- 结果保存目录：experiment-2021-11-18-46422
+- 标准化特征
+- 单机单卡
+- **graphsage**
+- `batch_size=2048 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=4`
+- 提交结果
+    - 1
+        - 模型：model-best-val-acc-0.56566.pth
+        - 文件：model-best-val-acc-0.56566-1637232739.csv
+        - 得分：49.5110883012344
+    - 2
+        - 模型：model-best-val-acc-0.56764.pth
+        - 文件：model-best-val-acc-0.56764-1637248158.csv
+        - 得分：51.25559
+    - 3
+        - 模型：model-best-val-acc-0.56798.pth
+        - 文件：model-best-val-acc-0.56798-1637291061.csv
+        - 得分：51.27000
+- 备注
+    1. 在当前超参数设置下，将graphconv替换为graphsage
+    2. 达到了最佳效果，**或许graphsage并不是最佳选择**
+    3. 可能还处于欠拟合阶段
