@@ -31,26 +31,36 @@ class GraphSageModel(thnn.Module):
 
         self.layers = thnn.ModuleList()
 
+        hidden_dim.insert(0, in_feats)
+        hidden_dim.append(self.n_classes)
         # build multiple layers
-        self.layers.append(dglnn.SAGEConv(in_feats=self.in_feats,
-                                          out_feats=self.hidden_dim,
-                                          aggregator_type='mean'))
-                                          # aggregator_type = 'pool'))
-        for l in range(1, (self.n_layers - 1)):
-            self.layers.append(dglnn.SAGEConv(in_feats=self.hidden_dim,
-                                              out_feats=self.hidden_dim,
-                                              aggregator_type='mean'))
-                                              # aggregator_type='pool'))
-        self.layers.append(dglnn.SAGEConv(in_feats=self.hidden_dim,
-                                          out_feats=self.n_classes,
-                                          aggregator_type='mean'))
-                                          # aggregator_type = 'pool'))
+        for l in range(len(hidden_dim)-1):
+            self.layers.append(dglnn.SAGEConv(in_feats=hidden_dim[l], 
+                                               out_feats=hidden_dim[l+1],
+                                               aggregator_type='mean'))
+#         self.layers.append(dglnn.SAGEConv(in_feats=self.in_feats,
+#                                           out_feats=self.hidden_dim,
+#                                           aggregator_type='mean'))
+#                                           # aggregator_type = 'pool'))
+#         for l in range(1, (self.n_layers - 1)):
+#             self.layers.append(dglnn.SAGEConv(in_feats=self.hidden_dim,
+#                                               out_feats=self.hidden_dim,
+#                                               aggregator_type='mean'))
+#                                               # aggregator_type='pool'))
+#         self.layers.append(dglnn.SAGEConv(in_feats=self.hidden_dim,
+#                                           out_feats=self.n_classes,
+#                                           aggregator_type='mean'))
+#                                           # aggregator_type = 'pool'))
 
     def forward(self, blocks, features):
         h = features
 
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
             h = layer(block, h)
+            if l == 0:
+                del features
+            del block
+            gc.collect()
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
