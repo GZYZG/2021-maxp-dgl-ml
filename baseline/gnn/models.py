@@ -153,7 +153,7 @@ class GraphAttnModel(thnn.Module):
 
         # build multiple layers
         self.layers.append(dglnn.GATConv(in_feats=self.in_feats,
-                                         out_feats=self.hidden_dim,
+                                         out_feats=self.hidden_dim[0],
                                          num_heads=self.heads[0],
                                          feat_drop=self.feat_dropout,
                                          attn_drop=self.attn_dropout,
@@ -161,14 +161,14 @@ class GraphAttnModel(thnn.Module):
 
         for l in range(1, (self.n_layers - 1)):
             # due to multi-head, the in_dim = num_hidden * num_heads
-            self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim * self.heads[l - 1],
-                                             out_feats=self.hidden_dim,
+            self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim[l-1] * self.heads[l - 1],
+                                             out_feats=self.hidden_dim[l],
                                              num_heads=self.heads[l],
                                              feat_drop=self.feat_dropout,
                                              attn_drop=self.attn_dropout,
                                              activation=self.activation))
 
-        self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim * self.heads[-2],
+        self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim[-1] * self.heads[-2],
                                          out_feats=self.n_classes,
                                          num_heads=self.heads[-1],
                                          feat_drop=self.feat_dropout,
@@ -179,9 +179,15 @@ class GraphAttnModel(thnn.Module):
         h = features
 
         for l in range(self.n_layers - 1):
-            h = self.layers[l](blocks[l], h).flatten(1)
+            h = self.layers[l](blocks[0], h).flatten(1)
+            if l == 0:
+                del features
+            del blocks[0]
+            gc.collect()
 
-        logits = self.layers[-1](blocks[-1],h).mean(1)
+        logits = self.layers[-1](blocks[0],h).mean(1)
+        del blocks[0]
+        gc.collect()
 
         return logits
 
