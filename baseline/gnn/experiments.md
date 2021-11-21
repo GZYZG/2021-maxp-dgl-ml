@@ -545,6 +545,67 @@
         - 得分：51.41136
 - 备注
     1. 在当前超参数设置下，将graphconv替换为graphsage
-    2. 达到了最佳效果，**或许graphsage并不是最佳选择**
+    2. 达到了最佳效果，**或许graphsage并不是最佳选择**，现在看起来graphsage的泛化效果更好
     3. 可能还处于欠拟合阶段
     4. 使用推断的类别替换预测的类别后，效果提升了0.1413612%，推断的结点中共有3506个结点的类别与预测的类别不同，其中推断的结果比预测的结果正确的个数多837
+    
+---
+
+## 2021-11-19
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphsage --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 2048 --GPU 1 --epochs 150 --out_path ./output --num_workers_per_gpu 1 --accumulation 4`
+- 结果保存目录：experiment-2021-11-19-1624
+- 标准化特征
+- 单机单卡
+- **graphsage**
+- **增加了l1损失**
+- `batch_size=2048 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=4`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-best-val-acc-0.5647-1637333785.csv
+        - 文件：model-best-val-acc-0.5647-1637333785.csv
+        - 得分：51.17141
+    - 2
+        - 模型：model-best-val-acc-0.56485.pth
+        - 文件：model-best-val-acc-0.56485-1637414200.csv
+        - 得分：50.87563
+    - 3 （与2的差别：未使用类别推测）
+        - 模型：model-best-val-acc-0.56485.pth
+        - 文件：model-best-val-acc-0.56485-1637414358.csv
+        - 得分：50.70230
+    - 4
+        - 模型：model-best-val-acc-0.5653.pth
+        - 文件：model-best-val-acc-0.5653-1637392099.csv
+        - 得分：50.94181
+- 备注
+    1. 总体来说，使用类别推测能提升一点（目前观测到的提升：0.14，0.17）
+    2. **graphsage效果普遍优于graphconv**
+    3. 增加了l1损失后效果不明显
+    4. 感觉可以增大epoch
+    
+---
+
+## 2021-11-20
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 150 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-20-9022
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **使用了l1损失**
+- `batch_size=2048 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=4`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-best-val-acc-0.56786-1637483616.csv
+        - 文件：model-best-val-acc-0.56786-1637483616.csv
+        - 得分：51.36949
+    - 2
+        - 模型：model-best-val-acc-0.56771.pth
+        - 文件：model-best-val-acc-0.56771-1637483958.csv
+        - 得分：51.39020
+    - 3
+        - 模型：model-best-val-acc-0.5672.pth
+        - 文件：model-best-val-acc-0.5672-1637484279.csv
+        - 得分：51.25469
+- 备注
+    1. **graphattn**的效果似乎也不是那么差，目前看起来略胜**graphconv**
+    2. graphconv的线上线下差距最大
+    
