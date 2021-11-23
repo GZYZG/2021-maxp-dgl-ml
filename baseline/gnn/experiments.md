@@ -591,7 +591,7 @@
 - 单机单卡
 - **graphattn**
 - **使用了l1损失**
-- `batch_size=2048 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=4`
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=150 accumulation=8`
 - 提交结果，使用了类别推测
     - 1 
         - 模型：model-best-val-acc-0.56786-1637483616.csv
@@ -608,4 +608,31 @@
 - 备注
     1. **graphattn**的效果似乎也不是那么差，目前看起来略胜**graphconv**
     2. graphconv的线上线下差距最大
-    
+
+---
+
+## 2021-11-21
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 200 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-21-54632
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **没有使用l1损失**
+- `batch_size=2014 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-best-val-acc-0.56949-1637633221.csv
+        - 文件：model-best-val-acc-0.56949-1637633221.csv
+        - 得分：51.59594
+    - 2 
+        - 模型：model-best-val-acc-0.56935.pth
+        - 文件：model-best-val-acc-0.56935-1637637902.csv
+        - 得分：51.86471
+    - 3 
+        - 模型：model-best-val-acc-0.56883.pth
+        - 文件：model-best-val-acc-0.56883-1637647875.csv
+        - 得分：51.92143
+- 备注
+    1. 不使用l1正则后效果提升明显
+    2. **graphattn**达到了最佳效果
+    3. 出现了过拟合
