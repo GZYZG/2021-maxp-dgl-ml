@@ -27,7 +27,7 @@ def load_dgl_graph(base_path, use_infer=False):
     with open(os.path.join(base_path, 'labels.pkl'), 'rb') as f:
         label_data = pickle.load(f)
 
-    labels = th.from_numpy(label_data['label'])
+    labels = label_data['label']
     tr_label_idx = label_data['tr_label_idx']
     val_label_idx = label_data['val_label_idx']
     test_label_idx = label_data['test_label_idx']
@@ -45,11 +45,13 @@ def load_dgl_graph(base_path, use_infer=False):
     
     if use_infer:
         # 用推测出的类别替换原来的-1
-        with open(os.path.join(data_path, 'infer_nodes.pkl'), 'rb') as f:
+        with open(os.path.join(base_path, 'infer_nodes.pkl'), 'rb') as f:
             infer_nodes = pickle.load(f)
         infer_train_idx = infer_nodes['train_idx']
         infer_train_label = infer_nodes['train_lab']
         labels[infer_train_idx] = infer_train_label
+    
+    labels = th.from_numpy(labels)
 
     return graph, labels, tr_label_idx, val_label_idx, test_label_idx, node_feat
 

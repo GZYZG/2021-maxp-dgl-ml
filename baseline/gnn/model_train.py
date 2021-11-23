@@ -151,7 +151,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
               graph_data, gnn_model,
               hidden_dim, n_layers, n_classes, fanouts,
               batch_size=32, num_workers=4, epochs=100, accumulation=1, message_queue=None,
-              weights=None, l1_weight=0.0
+              weights=None, l1_weight=0.0,
               output_folder='./output'):
     global writer
     
@@ -426,7 +426,7 @@ if __name__ == '__main__':
     parser.add_argument('--log_name', type=str, default=f"experiment-{t_year}-{t_month}-{t_day}-{np.random.randint(100000)}")
     parser.add_argument('--accumulation', type=int, default=1, help="accumulation gradient")
     parser.add_argument('--class_weights', action='store_true', help="Use class weights or not.")
-    parser.add_argument('--user_infer', action='store_true', help="Use infered train nodes or not.")
+    parser.add_argument('--use_infer', action='store_true', help="Use infered train nodes or not.")
     parser.add_argument('--l1_weight', type=float, default=0.0, help="Weight of l1 regularization loss.")
     args = parser.parse_args()
     
@@ -444,7 +444,7 @@ if __name__ == '__main__':
     ACCUMULATION = args.accumulation
     CLASS_WEIGHTS = args.class_weights
     USE_INFER = args.use_infer
-    L1_WEIGHT =args.l1_weight
+    L1_WEIGHT = args.l1_weight
     
     exp_dir = os.path.join(OUT_PATH, args.log_name)  # 实验输出目录
     if not os.path.exists(exp_dir):
