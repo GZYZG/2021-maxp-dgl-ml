@@ -1,11 +1,13 @@
 nohup python3.8 model_train.py --data_path ../../dataset \
-	--gnn_model graphsage \
+	--gnn_model graphattn \
 	--hidden_dim 192 64 \
 	--n_layers 3 \
 	--fanout 15,15,15 \
-	--batch_size 2048 \
+	--batch_size 1024 \
 	--GPU 1 \
-	--epochs 150 \
+	--epochs 200 \
+	--use_infer \
+	--l1_weight 0 \
 	--out_path ./output \
-	--num_workers_per_gpu 1\
-	--accumulation 4 > nohup.log 2>&1 &
+	--num_workers_per_gpu 1 \
+	--accumulation 8 > nohup.log 2>&1 &
