@@ -8,6 +8,7 @@
 import os
 import sys
 import argparse
+import pickle
 import datetime as dt
 import numpy as np
 import torch as th
@@ -361,11 +362,11 @@ def gpu_train(proc_id, n_gpus, GPUS,
         writer.add_scalar("val_epoch/acc", np.mean(val_acc_list), epoch)
         
         if np.mean(val_acc_list) - best_val_acc >= 0.00001:
-            model_path = os.path.join(output_folder, f"model-best-val-acc-{np.mean(val_acc_list):.5}.pth")
+            model_path = os.path.join(output_folder, f"model-{epoch}-best-val-acc-{np.mean(val_acc_list):.5}.model")
             logging.info(f"Saved model with best val acc to {model_path}.\t({best_val_acc} -> {np.mean(val_acc_list)}) .")
             best_val_acc = np.mean(val_acc_list)
-            model_para_dict = model.state_dict()
-            th.save(model_para_dict, model_path)
+#             model_para_dict = model.state_dict()
+            th.save(model, model_path)
             
         
         # put validation results into message queue and aggregate at device 0
@@ -393,17 +394,18 @@ def gpu_train(proc_id, n_gpus, GPUS,
     # plot_p_r_curve(val_y.cpu().numpy(), best_logits[:, 1])
 
     # -------------------------6. Save models --------------------------------------#
-    model_path = os.path.join(output_folder, 'dgl_model-' + '{:06d}'.format(np.random.randint(100000)) + '.pth')
+    model_path = os.path.join(output_folder, 'dgl_model-' + '{:06d}'.format(np.random.randint(100000)) + '.model')
 
     if n_gpus > 1:
         if proc_id == 0:
-            model_para_dict = model.state_dict()
-            th.save(model_para_dict, model_path)
+#             model_para_dict = model.state_dict()
+#             th.save(model_para_dict, model_path)  # 保留模型参数
+            th.save(model, model_path)  # 保留模型结构和参数
             # after trainning, remember to cleanup and release resouces
             cleanup()
     else:
-        model_para_dict = model.state_dict()
-        th.save(model_para_dict, model_path)
+#         model_para_dict = model.state_dict()
+        th.save(model, model_path)
     
     logging.info(f"model saved to {model_path}")
 
@@ -473,8 +475,16 @@ if __name__ == '__main__':
     logging.info('Output path: {}'.format(OUT_PATH))
 
     # Retrieve preprocessed data and add reverse edge and self-loop
-    graph, labels, train_nid, val_nid, test_nid, node_feat = load_dgl_graph(BASE_PATH, use_infer=USE_INFER)
-    train_nid, val_nid = train_val_split(labels.numpy(), seed=444)
+    graph, labels, train_nid, val_nid, test_nid, node_feat = load_dgl_graph(BASE_PATH)
+    train_nid, val_nid = train_val_split(labels.numpy(), tr_ratio=0.85, seed=444)
+    if USE_INFER:
+        # 用推测出的类别替换原来的-1
+        with open(os.path.join(BASE_PATH, 'infer_nodes.pkl'), 'rb') as f:
+            infer_nodes = pickle.load(f)
+        infer_train_idx = infer_nodes['train_idx']
+        infer_train_label = infer_nodes['train_lab']
+        labels[infer_train_idx] = th.from_numpy(infer_train_label)
+        
     graph = dgl.to_bidirected(graph, copy_ndata=True)
     graph = dgl.add_self_loop(graph)
     
