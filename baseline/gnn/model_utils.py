@@ -11,6 +11,8 @@ import traceback
 from _thread import start_new_thread
 import torch.multiprocessing as mp
 
+from models import GraphSageModel, GraphConvModel, GraphAttnModel
+
 
 class early_stopper(object):
 
@@ -90,3 +92,24 @@ def l1_regularization(model):
         regularization_loss += th.sum(abs(param))
         n += prod(param.shape)
     return regularization_loss / n
+
+
+def create_model(gnn_model, in_feat, hidden_dim, n_layers, n_classes, n_heads=3, dropout=0, feat_drop=0, attn_drop=0):
+    """模型工厂"""
+    if gnn_model == 'graphsage':
+        model = GraphSageModel(in_feat, hidden_dim, n_layers, n_classes, dropout=dropout)
+    elif gnn_model == 'graphconv':
+        model = GraphConvModel(in_feat, hidden_dim, n_layers, n_classes,
+                               norm='both', activation=F.relu, dropout=dropout)
+    elif gnn_model == 'graphattn':
+        if isinstance(n_heads, int):
+            heads = [n_heads] * n_layers
+        elif len(n_heads) != n_layers:
+            raise ValueError(f"Length of heads{len(heads)} shoud equal n_layers({n_layers})")
+                  
+        model = GraphAttnModel(in_feat, hidden_dim, n_layers, n_classes,
+                               heads=heads, activation=F.relu, feat_drop=feat_drop, attn_drop=feat_drop)
+    else:
+        raise NotImplementedError('So far, only support three algorithms: GraphSage, GraphConv, and GraphAttn')
+        
+    return model
