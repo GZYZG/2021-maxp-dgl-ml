@@ -11,7 +11,7 @@ import numpy as np
 import torch as th
 
 
-def load_dgl_graph(base_path, use_infer=False):
+def load_dgl_graph(base_path):
     """
     读取预处理的Graph，Feature和Label文件，并构建相应的数据供训练代码使用。
 
@@ -43,13 +43,13 @@ def load_dgl_graph(base_path, use_infer=False):
     print('################ Feature info: ###############')
     print('Node\'s feature shape:{}'.format(node_feat.shape))
     
-    if use_infer:
-        # 用推测出的类别替换原来的-1
-        with open(os.path.join(base_path, 'infer_nodes.pkl'), 'rb') as f:
-            infer_nodes = pickle.load(f)
-        infer_train_idx = infer_nodes['train_idx']
-        infer_train_label = infer_nodes['train_lab']
-        labels[infer_train_idx] = infer_train_label
+#     if use_infer:
+#         # 用推测出的类别替换原来的-1
+#         with open(os.path.join(base_path, 'infer_nodes.pkl'), 'rb') as f:
+#             infer_nodes = pickle.load(f)
+#         infer_train_idx = infer_nodes['train_idx']
+#         infer_train_label = infer_nodes['train_lab']
+#         labels[infer_train_idx] = infer_train_label
     
     labels = th.from_numpy(labels)
 
