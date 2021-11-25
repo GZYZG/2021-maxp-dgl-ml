@@ -618,7 +618,7 @@
 - 单机单卡
 - **graphattn**
 - **没有使用l1损失**
-- `batch_size=2014 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
 - 提交结果，使用了类别推测
     - 1 
         - 模型：model-best-val-acc-0.56949-1637633221.csv
@@ -636,3 +636,61 @@
     1. 不使用l1正则后效果提升明显
     2. **graphattn**达到了最佳效果
     3. 出现了过拟合
+    
+---
+
+## 2021-11-23
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 200 --use_infer --l1_weight 0 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-23-34626
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **没有使用l1损失**
+- heads=[3, 3, 3]
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-best-val-acc-0.57441.pth
+        - 文件：model-best-val-acc-0.57441-1637736284.csv
+        - 得分：51.5351647263265
+    - 2 
+        - 模型：model-best-val-acc-0.57293.pth
+        - 文件：model-best-val-acc-0.57293-1637736723.csv
+        - 得分：51.71704347
+    - 3 
+        - 模型：model-best-val-acc-0.57204.pth
+        - 文件：model-best-val-acc-0.57204-1637738278.csv
+        - 得分：51.24164
+- 备注
+    1. 训练集中包含了推断出来的结点，验证集上效果有较好的提升，但是线上效果不佳
+    2. 受挖矿程序的影响，训练止步于第51个epoch
+    3. 推断出来的结点，有可能也会混入验证集中
+
+---
+
+## 2021-11-24
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 200 --use_infer --l1_weight 0 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-24-53928
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **没有使用l1损失**
+- heads=[3, 3, 3]
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-156-best-val-acc-0.56986.model
+        - 文件：model-156-best-val-acc-0.56986-1637851415.csv
+        - 得分：51.49690
+    - 2
+        - 模型：model-90-best-val-acc-0.56889.model
+        - 文件：model-90-best-val-acc-0.56889-1637851845.csv
+        - 得分：51.71164
+    - 3
+        - 模型：model-60-best-val-acc-0.56851.model
+        - 文件：model-60-best-val-acc-0.56851-1637852078.csv
+        - 得分：51.82464
+- 备注
+    1. 推测的训练节点只用于训练，验证集的比例为不加推测节点的训练集的0.15
+    2. 加入推测节点的效果并不太好
+    3. 200 epoch过拟合了
