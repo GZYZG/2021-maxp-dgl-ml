@@ -5,8 +5,11 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 import dgl
+import numpy as np
 from ogb.nodeproppred import DglNodePropPredDataset, Evaluator
 from model import MLP, MLPLinear, GAT, CorrectAndSmooth
+from dgl.dataloading.neighbor import MultiLayerNeighborSampler
+from dgl.dataloading.pytorch import NodeDataLoader
 
 
 def adjust_learning_rate(optimizer, lr, epoch):
@@ -31,6 +34,8 @@ def main():
 
     split_idx = dataset.get_idx_split()
     g, labels = dataset[0] # graph: DGLGraph object, label: torch tensor of shape (num_nodes, num_tasks)
+#     g = dgl.to_bidirected(g, copy_ndata=True)  # g 是多重图，不支持双向
+    g = dgl.add_self_loop(g)
     
     if args.dataset == 'ogbn-arxiv':
         if args.model == 'gat':
@@ -43,14 +48,14 @@ def main():
         feat = (feat - feat.mean(0)) / feat.std(0)
         g.ndata['feat'] = feat
 
-    g = g.to(device)
+#     g = g.to(device)
     feats = g.ndata['feat']
     labels = labels.to(device)
 
     # load masks for train / validation / test
-    train_idx = split_idx["train"].to(device)
-    valid_idx = split_idx["valid"].to(device)
-    test_idx = split_idx["test"].to(device)
+    train_idx = split_idx["train"]#.to(device)
+    valid_idx = split_idx["valid"]#.to(device)
+    test_idx = split_idx["test"]#.to(device)
 
     n_features = feats.size()[-1]
     n_classes = dataset.num_classes
@@ -71,9 +76,36 @@ def main():
                     attn_drop=args.attn_drop)
     else:
         raise NotImplementedError(f'Model {args.model} is not supported.')
-
+    
     model = model.to(device)
     print(f'Model parameters: {sum(p.numel() for p in model.parameters())}')
+    print(model)
+    
+    sampler = MultiLayerNeighborSampler(args.fanouts)
+    train_dataloader = NodeDataLoader(g,
+                                      train_idx,
+                                      sampler,
+                                      batch_size=args.batchsize,
+                                      shuffle=True,
+                                      drop_last=False,
+#                                       num_workers=4,
+                                      )    
+    val_dataloader = NodeDataLoader(g,
+                                    valid_idx,
+                                    sampler,
+                                    batch_size=args.batchsize,
+                                    shuffle=True,
+                                    drop_last=False,
+#                                     num_workers=4,
+                                    )
+    test_dataloader = NodeDataLoader(g,
+                                    test_idx,
+                                    sampler,
+                                    batch_size=args.batchsize,
+                                    shuffle=True,
+                                    drop_last=False,
+#                                     num_workers=4,
+                                    )
 
     if args.pretrain:
         print('---------- Before ----------')
@@ -118,52 +150,90 @@ def main():
 
         # training
         print('---------- Training ----------')
-        for i in range(args.epochs):
+        for epoch in range(args.epochs):
+            print(f"\n{'='*35} Epoch {epoch} {'='*35}")
             if args.model == 'gat':
-                adjust_learning_rate(opt, args.lr, i)
-
+                adjust_learning_rate(opt, args.lr, epoch)
+            
+            # mini-batch 训练模型
             model.train()
-            opt.zero_grad()
-
-            if args.model == 'gat':
-                logits = model(g, feats)
-            else:
-                logits = model(feats)
-            
-            train_loss = F.nll_loss(logits[train_idx], labels.squeeze(1)[train_idx])
-            train_loss.backward()
-
-            opt.step()
-            
-            model.eval()
-            with torch.no_grad():
+            train_count = 0
+            for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
+                blocks = [block.to(device) for block in blocks]
+                batch_feats = feats[input_nodes]
+                batch_feats = batch_feats.to(device)
+#                 print(f"batch_feats: {batch_feats.shape}\tinput_nodes: {input_nodes.shape}\tseeds: {seeds.shape}\tblocks: {[block.num_nodes() for block in blocks]}")
                 if args.model == 'gat':
-                    logits = model(g, feats)
+                    logits = model(blocks, batch_feats)
                 else:
-                    logits = model(feats)
+                    logits = model(batch_feats)
+                    
+                train_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
+                
+                train_count += sum(logits.argmax(axis=1) == labels.squeeze(1)[seeds])
+                
+                print(('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
+                                                                                            step,
+                                                                                            train_loss.item(),
+                                                                                            train_count / seeds.shape[0])))
+                opt.zero_grad()
+                train_loss.backward()
+                opt.step()
+                
+            # mini-batch 评估模型
+            model.eval()
+            val_count = 0
+            for step, (input_nodes, seeds, blocks) in enumerate(val_dataloader):
+                blocks = [block.to(device) for block in blocks]
+                batch_feats = feats[input_nodes]
+                batch_feats = batch_feats.to(device)
+                if args.model == 'gat':
+                    logits = model(g, batch_feats)
+                else:
+                    logits = model(batch_feats)
+                    
+                val_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
                 
                 y_pred = logits.argmax(dim=-1, keepdim=True)
+                val_count += sum(y_pred.argmax(axis=1) == labels.squeeze(1)[seeds])
+                print(('In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_acc:{:.4f}'.format(epoch,
+                                                                                            step,
+                                                                                            val_loss.item(),
+                                                                                            val_count / seeds.shape[0])))
 
-                train_acc = evaluate(y_pred, labels, train_idx, evaluator)
-                valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
+            train_acc = train_count / train_idx.shape[0]
+            valid_acc = val_count / train_idx.shape[0]  # evaluate(y_pred, labels, valid_idx, evaluator)
 
-                print(f'Epoch {i} | Train loss: {train_loss.item():.4f} | Train acc: {train_acc:.4f} | Valid acc {valid_acc:.4f}')
+            print(f'Epoch {epoch} | Train acc: {train_acc:.4f} | Valid acc {valid_acc:.4f}')
 
-                if valid_acc > best_acc:
-                    best_acc = valid_acc
-                    best_model = copy.deepcopy(model)
+            if valid_acc > best_acc:
+                best_acc = valid_acc
+                best_model = copy.deepcopy(model)
         
         # testing & saving model
         print('---------- Testing ----------')
         best_model.eval()
+        test_count = 0
+        for step, (input_nodes, seeds, blocks) in enumerate(test_dataloader):
+            blocks = [block.to(device) for block in blocks]
+            batch_feats = feats[input_nodes]
+            batch_feats = batch_feats.to(device)
+            if args.model == 'gat':
+                logits = best_model(blocks, batch_feats)
+            else:
+                logits = best_model(batch_feats)
+                
+            test_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
+            
+            test_count += sum(logits.argmax(axis=1) == labels.squeeze(1)[seeds])
+            
+            print(('In epoch:{:03d}|batch:{:04d}, test_loss:{:4f}, test_acc:{:.4f}'.format(epoch,
+                                                                                            step,
+                                                                                            test_loss.item(),
+                                                                                            test_count / seeds.shape[0])))
         
-        if args.model == 'gat':
-            logits = best_model(g, feats)
-        else:
-            logits = best_model(feats)
         
-        y_pred = logits.argmax(dim=-1, keepdim=True)
-        test_acc = evaluate(y_pred, labels, test_idx, evaluator)
+        test_acc = test_count / test_idx.shape[0]  # evaluate(y_pred, labels, test_idx, evaluator)
         print(f'Test acc: {test_acc:.4f}')
 
         if not os.path.exists('base'):
@@ -188,6 +258,8 @@ if __name__ == '__main__':
     parser.add_argument('--dropout', type=float, default=0.4)
     parser.add_argument('--lr', type=float, default=0.01)
     parser.add_argument('--epochs', type=int, default=300)
+    parser.add_argument('--fanouts', type=int, nargs='+', required=True)
+    parser.add_argument('--batchsize', type=int, default=4096)
     # extra options for gat
     parser.add_argument('--n-heads', type=int, default=3)
     parser.add_argument('--attn_drop', type=float, default=0.05)
