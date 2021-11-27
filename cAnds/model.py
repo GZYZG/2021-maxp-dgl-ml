@@ -1,3 +1,4 @@
+import gc
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -96,7 +97,8 @@ class GAT(nn.Module):
             self.convs.append(GATConv(in_hidden,
                                       out_hidden,
                                       num_heads=n_heads,
-                                      attn_drop=attn_drop))
+                                      attn_drop=attn_drop,
+                                      allow_zero_in_degree=True))
             self.linear.append(nn.Linear(in_hidden, out_channels * out_hidden, bias=False))
             if i < n_layers - 1:
                 self.bns.append(nn.BatchNorm1d(out_channels * out_hidden))
@@ -107,13 +109,17 @@ class GAT(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.activation = activation
 
-    def forward(self, graph, feat):
+    def forward(self, blocks, feat):
         h = feat
         h = self.dropout0(h)
 
         for i in range(self.n_layers):
-            conv = self.convs[i](graph, h)
-            linear = self.linear[i](h).view(conv.shape)
+#             print(f"{i}: {blocks[i]}\tdstdata:{blocks[i].dstdata['feat'].shape}\th: {h.shape}")
+            conv = self.convs[i](blocks[0], h)
+#             print(f"conv-{i}: {conv.shape}")
+            linear = self.linear[i](blocks[0].dstdata['feat'] if i == 0 else h[:blocks[0].number_of_dst_nodes()])
+#             print(f"linear-{i}: {linear.shape}")
+            linear = linear.view(conv.shape)
 
             h = conv + linear
 
@@ -122,6 +128,10 @@ class GAT(nn.Module):
                 h = self.bns[i](h)
                 h = self.activation(h)
                 h = self.dropout(h)
+            if i == 0:
+                del feat
+            del blocks[0]
+            gc.collect()
 
         h = h.mean(1)
         h = self.bias_last(h)
