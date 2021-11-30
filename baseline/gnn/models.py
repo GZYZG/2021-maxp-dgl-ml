@@ -5,7 +5,7 @@
 """
     Three common GNN models.
 """
-
+import torch as th
 import torch.nn as thnn
 import torch.nn.functional as F
 import dgl.nn as dglnn
@@ -126,12 +126,26 @@ class GraphConvModel(thnn.Module):
 
         return h
 
+    
+class Bias(thnn.Module):
+    def __init__(self, size):
+        super().__init__()
+
+        self.bias = thnn.Parameter(th.Tensor(size))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        thnn.init.zeros_(self.bias)
+
+    def forward(self, x):
+        return x + self.bias
+    
 
 class GraphAttnModel(thnn.Module):
 
     def __init__(self,
                  in_feats,
-                 hidden_dim,
+                 hidden_dims,
                  n_layers,
                  n_classes,
                  heads,
@@ -141,7 +155,7 @@ class GraphAttnModel(thnn.Module):
                  ):
         super(GraphAttnModel, self).__init__()
         self.in_feats = in_feats
-        self.hidden_dim = hidden_dim
+        self.hidden_dims = hidden_dims
         self.n_layers = n_layers
         self.n_classes = n_classes
         self.heads = heads
@@ -149,45 +163,58 @@ class GraphAttnModel(thnn.Module):
         self.attn_dropout = attn_drop
         self.activation = activation
 
-        self.layers = thnn.ModuleList()
+        self.convs = thnn.ModuleList()
+        self.linears = thnn.ModuleList()
+        self.bns = thnn.ModuleList()
+        
 
-        # build multiple layers
-        self.layers.append(dglnn.GATConv(in_feats=self.in_feats,
-                                         out_feats=self.hidden_dim[0],
-                                         num_heads=self.heads[0],
-                                         feat_drop=self.feat_dropout,
-                                         attn_drop=self.attn_dropout,
-                                         activation=self.activation))
-
-        for l in range(1, (self.n_layers - 1)):
+        # build multiple layers        
+        for l in range(self.n_layers):
             # due to multi-head, the in_dim = num_hidden * num_heads
-            self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim[l-1] * self.heads[l - 1],
-                                             out_feats=self.hidden_dim[l],
-                                             num_heads=self.heads[l],
+            in_hidden = heads[l-1] * hidden_dims[l-1] if l >  0 else self.in_feats
+            out_hidden = heads[l] * hidden_dims[l] if l < self.n_layers - 1 else heads[l] * n_classes
+            
+            self.convs.append(dglnn.GATConv(in_feats=in_hidden,
+                                             out_feats=hidden_dims[l] if l < self.n_layers - 1 else n_classes,
+                                             num_heads=heads[l],
                                              feat_drop=self.feat_dropout,
-                                             attn_drop=self.attn_dropout,
-                                             activation=self.activation))
+                                             attn_drop=self.attn_dropout))
+            self.linears.append(thnn.Linear(in_hidden, out_hidden, bias=True))
+            if l < self.n_layers - 1:
+                self.bns.append(thnn.BatchNorm1d(out_hidden))
 
-        self.layers.append(dglnn.GATConv(in_feats=self.hidden_dim[-1] * self.heads[-2],
-                                         out_feats=self.n_classes,
-                                         num_heads=self.heads[-1],
-                                         feat_drop=self.feat_dropout,
-                                         attn_drop=self.attn_dropout,
-                                         activation=None))
+        self.dropout0 = thnn.Dropout(feat_drop)
+        self.dropout = thnn.Dropout(attn_drop)
+        self.bias_last = Bias(n_classes)
 
     def forward(self, blocks, features):
         h = features
+        h = self.dropout0(h)
 
-        for l in range(self.n_layers - 1):
-            h = self.layers[l](blocks[0], h).flatten(1)
-            if l == 0:
+        for i in range(self.n_layers):
+#             print(f"{i}: {blocks[0]}\th: {h.shape}")
+            conv = self.convs[i](blocks[0], h)
+# #             print(f"conv-{i}: {conv.shape}")
+            linear = self.linears[i](h[:blocks[0].number_of_dst_nodes()])
+#             print(f"linear-{i}: {linear.shape}")
+            linear = linear.view(conv.shape)
+
+            h = conv + linear
+#             h = conv
+
+            if i < self.n_layers - 1:
+                h = h.flatten(1)
+                h = self.bns[i](h)
+                h = self.activation(h)
+                h = self.dropout(h)
+            if i == 0:
                 del features
             del blocks[0]
             gc.collect()
 
-        logits = self.layers[-1](blocks[0],h).mean(1)
-        del blocks[0]
-        gc.collect()
+        h = h.mean(1)
+#         print(f"h: {h.shape}")
+        h = self.bias_last(h)
 
-        return logits
+        return h
 
