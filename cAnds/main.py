@@ -34,6 +34,7 @@ def main():
 
     split_idx = dataset.get_idx_split()
     g, labels = dataset[0] # graph: DGLGraph object, label: torch tensor of shape (num_nodes, num_tasks)
+    labels = labels.squeeze(1)
 #     g = dgl.to_bidirected(g, copy_ndata=True)  # g 是多重图，不支持双向
     g = dgl.add_self_loop(g)
     
@@ -59,7 +60,7 @@ def main():
 
     n_features = feats.size()[-1]
     n_classes = dataset.num_classes
-    
+    print(f"n_classes: {n_classes}")
     # load model
     if args.model == 'mlp':
         model = MLP(n_features, args.hid_dim, n_classes, args.num_layers, args.dropout)
@@ -113,13 +114,27 @@ def main():
         model.eval()
 
         if args.model == 'gat':
-            y_soft = model(g, feats).exp()
+            y_soft = torch.empty((train_idx.shape[0] + valid_idx.shape[0] + test_idx.shape[0], n_classes))
+            for dataloader in [train_dataloader, val_dataloader, test_dataloader]:
+                for step, (input_nodes, seeds, blocks) in enumerate(train_dataloader):
+                    blocks = [block.to(device) for block in blocks]
+                    batch_feats = feats[input_nodes]
+                    batch_feats = batch_feats.to(device)
+                    if args.model == 'gat':
+                        logits = model(blocks, batch_feats)
+                    else:
+                        logits = model(batch_feats)
+                    logits = logits.exp()
+                    y_soft[seeds] = logits.detach().cpu()
+                    
+#             y_soft = y_soft.to(device)
+#             y_soft = model(g, feats).exp()
         else:
             y_soft = model(feats).exp()
 
         y_pred = y_soft.argmax(dim=-1, keepdim=True)
-        valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
-        test_acc = evaluate(y_pred, labels, test_idx, evaluator)
+        valid_acc = evaluate(y_pred, labels.unsqueeze(-1), valid_idx, evaluator)
+        test_acc = evaluate(y_pred, labels.unsqueeze(-1), test_idx, evaluator)
         print(f'Valid acc: {valid_acc:.4f} | Test acc: {test_acc:.4f}')
 
         print('---------- Correct & Smoothing ----------')
@@ -134,10 +149,10 @@ def main():
         mask_idx = torch.cat([train_idx, valid_idx])
         if args.model != 'gat':
             y_soft = cs.correct(g, y_soft, labels[mask_idx], mask_idx)
-        y_soft = cs.smooth(g, y_soft, labels[mask_idx], mask_idx)
+        y_soft = cs.smooth(g, y_soft, labels[mask_idx].cpu(), mask_idx)
         y_pred = y_soft.argmax(dim=-1, keepdim=True)
-        valid_acc = evaluate(y_pred, labels, valid_idx, evaluator)
-        test_acc = evaluate(y_pred, labels, test_idx, evaluator)
+        valid_acc = evaluate(y_pred, labels.unsqueeze(-1), valid_idx, evaluator)
+        test_acc = evaluate(y_pred, labels.unsqueeze(-1), test_idx, evaluator)
         print(f'Valid acc: {valid_acc:.4f} | Test acc: {test_acc:.4f}')
     else:
         if args.model == 'gat':
@@ -168,17 +183,20 @@ def main():
                 else:
                     logits = model(batch_feats)
                     
-                train_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
-                
-                train_count += sum(logits.argmax(axis=1) == labels.squeeze(1)[seeds])
-                
-                print(('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
+                train_loss = F.nll_loss(logits, labels[seeds])
+                y_pred = logits.argmax(dim=-1, keepdim=True)
+                tmp = sum(y_pred.squeeze(1) == labels[seeds])
+                train_count += tmp
+#                 print(logits.argmax(axis=1) == labels.squeeze(1)[seeds])
+                print('Train: In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}, _train_acc:{:.4f}'.format(epoch,
                                                                                             step,
                                                                                             train_loss.item(),
-                                                                                            train_count / seeds.shape[0])))
-                opt.zero_grad()
+                                                                                            evaluator.eval({'y_true': labels[seeds].reshape((seeds.shape[0], 1)), 'y_pred': y_pred})['acc'],
+                                                                                            tmp / seeds.shape[0]))
+                
                 train_loss.backward()
                 opt.step()
+                opt.zero_grad()
                 
             # mini-batch 评估模型
             model.eval()
@@ -188,21 +206,24 @@ def main():
                 batch_feats = feats[input_nodes]
                 batch_feats = batch_feats.to(device)
                 if args.model == 'gat':
-                    logits = model(g, batch_feats)
+                    logits = model(blocks, batch_feats)
                 else:
                     logits = model(batch_feats)
                     
-                val_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
+                val_loss = F.nll_loss(logits, labels[seeds])
                 
                 y_pred = logits.argmax(dim=-1, keepdim=True)
-                val_count += sum(y_pred.argmax(axis=1) == labels.squeeze(1)[seeds])
-                print(('In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_acc:{:.4f}'.format(epoch,
+                
+                tmp = sum(y_pred.squeeze(1) == labels[seeds])
+                val_count += tmp
+                print('Validate: In epoch:{:03d}|batch:{:04d}, val_loss:{:4f}, val_acc:{:.4f}, _val_acc:{:.4f}'.format(epoch,
                                                                                             step,
                                                                                             val_loss.item(),
-                                                                                            val_count / seeds.shape[0])))
+                                                                                            evaluator.eval({'y_true': labels[seeds].reshape((seeds.shape[0], 1)), 'y_pred': y_pred})['acc'],
+                                                                                            tmp / seeds.shape[0]))
 
             train_acc = train_count / train_idx.shape[0]
-            valid_acc = val_count / train_idx.shape[0]  # evaluate(y_pred, labels, valid_idx, evaluator)
+            valid_acc = val_count / valid_idx.shape[0]  # evaluate(y_pred, labels, valid_idx, evaluator)
 
             print(f'Epoch {epoch} | Train acc: {train_acc:.4f} | Valid acc {valid_acc:.4f}')
 
@@ -223,14 +244,16 @@ def main():
             else:
                 logits = best_model(batch_feats)
                 
-            test_loss = F.nll_loss(logits, labels.squeeze(1)[seeds])
+            test_loss = F.nll_loss(logits, labels[seeds])
+            y_pred = logits.argmax(dim=-1, keepdim=True)
+            tmp = sum(y_pred.squeeze(1) == labels[seeds])
+            test_count += tmp
             
-            test_count += sum(logits.argmax(axis=1) == labels.squeeze(1)[seeds])
-            
-            print(('In epoch:{:03d}|batch:{:04d}, test_loss:{:4f}, test_acc:{:.4f}'.format(epoch,
+            print('Test: In epoch:{:03d}|batch:{:04d}, test_loss:{:4f}, test_acc:{:.4f}, _test_acc:{:.4f}'.format(epoch,
                                                                                             step,
                                                                                             test_loss.item(),
-                                                                                            test_count / seeds.shape[0])))
+                                                                                            evaluator.eval({'y_true': labels[seeds].reshape((seeds.shape[0], 1)), 'y_pred': y_pred})['acc'],
+                                                                                            tmp / seeds.shape[0]))
         
         
         test_acc = test_count / test_idx.shape[0]  # evaluate(y_pred, labels, test_idx, evaluator)

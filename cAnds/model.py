@@ -114,7 +114,7 @@ class GAT(nn.Module):
         h = self.dropout0(h)
 
         for i in range(self.n_layers):
-#             print(f"{i}: {blocks[i]}\tdstdata:{blocks[i].dstdata['feat'].shape}\th: {h.shape}")
+#             print(f"{i}: {blocks[0]}\tdstdata:{blocks[0].dstdata['feat'].shape}\th: {h.shape}")
             conv = self.convs[i](blocks[0], h)
 #             print(f"conv-{i}: {conv.shape}")
             linear = self.linear[i](blocks[0].dstdata['feat'] if i == 0 else h[:blocks[0].number_of_dst_nodes()])
@@ -122,6 +122,7 @@ class GAT(nn.Module):
             linear = linear.view(conv.shape)
 
             h = conv + linear
+            h = conv
 
             if i < self.n_layers - 1:
                 h = h.flatten(1)
@@ -134,6 +135,7 @@ class GAT(nn.Module):
             gc.collect()
 
         h = h.mean(1)
+#         print(f"h: {h.shape}")
         h = self.bias_last(h)
 
         return F.log_softmax(h, dim=-1)
