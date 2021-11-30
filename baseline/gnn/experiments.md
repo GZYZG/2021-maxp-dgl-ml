@@ -690,7 +690,67 @@
         - 模型：model-60-best-val-acc-0.56851.model
         - 文件：model-60-best-val-acc-0.56851-1637852078.csv
         - 得分：51.82464
+    - 4 与提交3不同之处：**未使用类别推测进行替换**，效果大约降低了0.14
+        - 模型：model-60-best-val-acc-0.56851-1637910361.csv
+        - 文件：model-60-best-val-acc-0.56851-1637910361.csv
+        - 得分：51.68148
+    - 5
+        - 模型：model-49-best-val-acc-0.56809.model
+        - 文件：model-49-best-val-acc-0.56809-1637909541.csv
+        - 得分：51.46854
 - 备注
     1. 推测的训练节点只用于训练，验证集的比例为不加推测节点的训练集的0.15
     2. 加入推测节点的效果并不太好
     3. 200 epoch过拟合了
+    4. 类别替换的提升效果基本上在0.14附近。可能是因为类别推出中的大部分结果都与模型预测的一致，小部分hard样本模型预测错误，且不能正确推测
+    
+---
+
+## 2021-11-26
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 200 --l1_weight 0 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-26-96292
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **没有使用l1损失**
+- **没有使用推测出的结点加入训练集**
+- heads=[3, 3, 3]
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-145-best-val-acc-0.57063.model
+        - 文件：model-145-best-val-acc-0.57063-1638010054.csv
+        - 得分：51.95925
+    - 2 
+        - 模型：model-126-best-val-acc-0.56996.model
+        - 得分：model-126-best-val-acc-0.56996-1638010438.csv
+        - 得分：51.72965
+        
+---
+
+## 2021-11-29
+- cmd：`python3.8 model_train.py --data_path ../../dataset --gnn_model graphattn --hidden_dim 192 64 --n_layers 3 --fanout 15,15,15 --batch_size 1024 --GPU 1 --epochs 150 --l1_weight 0 --out_path ./output --num_workers_per_gpu 1 --accumulation 8`
+- 结果保存目录：experiment-2021-11-29-16710
+- 标准化特征
+- 单机单卡
+- **graphattn**
+- **没有使用l1损失**
+- **没有使用推测出的结点加入训练集**
+- **在图注意力层间加入了残差层**
+- heads=[3, 3, 3]
+- `batch_size=1024 fanout=15,15,15 hidden_dim=192,64 n_layers=3 epoch=200 accumulation=8`
+- 提交结果，使用了类别推测
+    - 1 
+        - 模型：model-127-best-val-acc-0.56431.model
+        - 文件：model-127-best-val-acc-0.56431-1638277660.csv
+        - 得分：51.43567
+    - 2 
+        - 模型：model-105-best-val-acc-0.56419.model
+        - 文件：model-105-best-val-acc-0.56419-1638279044.csv
+        - 得分：51.43567
+    - 3
+        - 模型：model-85-best-val-acc-0.56397.model
+        - 文件：model-85-best-val-acc-0.56397-1638279387.csv
+        - 得分：51.41766
+- 备注
+    1. 加入残差层后效果并没有提升
