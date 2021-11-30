@@ -152,7 +152,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
               graph_data, gnn_model,
               hidden_dim, n_layers, n_classes, fanouts,
               batch_size=32, num_workers=4, epochs=100, accumulation=1, message_queue=None,
-              weights=None, l1_weight=0.0,
+              weights=None, l1_weight=0.0, dropout=0.4, attn_drop=0.05,
               output_folder='./output'):
     global writer
     
@@ -242,7 +242,7 @@ def gpu_train(proc_id, n_gpus, GPUS,
                                norm='both', activation=F.relu, dropout=0)
     elif gnn_model == 'graphattn':
         model = GraphAttnModel(in_feat, hidden_dim, n_layers, n_classes,
-                               heads=([3] * n_layers), activation=F.relu, feat_drop=0, attn_drop=0)
+                               heads=([3] * n_layers), activation=F.relu, feat_drop=dropout, attn_drop=attn_drop)
     else:
         raise NotImplementedError('So far, only support three algorithms: GraphSage, GraphConv, and GraphAttn')
 
@@ -319,19 +319,6 @@ def gpu_train(proc_id, n_gpus, GPUS,
                 writer.add_scalar("step/loss", step_loss, global_step)
                 writer.add_scalar("step/acc", step_acc, global_step)
                 global_step += 1       
-
-#             train_loss_list.append(train_loss.cpu().detach().numpy())
-#             tr_batch_pred = th.sum(th.argmax(train_batch_logits, dim=1) == batch_labels) / th.tensor(batch_labels.shape[0])
-#             train_acc_list.extend((th.argmax(train_batch_logits, dim=1) == batch_labels).cpu().detach().tolist())
-
-#             if step % 10 == 0:
-#                 logging.info('In epoch:{:03d}|batch:{:04d}, train_loss:{:4f}, train_acc:{:.4f}'.format(epoch,
-#                                                                                                 step,
-#                                                                                                 np.mean(train_loss_list),
-#                                                                                                 tr_batch_pred.detach()))
-#             writer.add_scalar("step/loss", train_loss.cpu().detach().numpy(), global_step)
-#             writer.add_scalar("step/acc", tr_batch_pred.detach(), global_step)
-#             global_step += 1
         
         writer.add_scalar("epoch/loss", np.mean(train_loss_list), epoch)
         writer.add_scalar("epoch/acc", np.mean(train_acc_list), epoch)
@@ -430,6 +417,9 @@ if __name__ == '__main__':
     parser.add_argument('--class_weights', action='store_true', help="Use class weights or not.")
     parser.add_argument('--use_infer', action='store_true', help="Use infered train nodes or not.")
     parser.add_argument('--l1_weight', type=float, default=0.0, help="Weight of l1 regularization loss.")
+    
+    parser.add_argument('--dropout', type=float, default=0.3)
+    parser.add_argument('--attn_drop', type=float, default=0.05)
     args = parser.parse_args()
     
     # parse arguments
@@ -447,6 +437,8 @@ if __name__ == '__main__':
     CLASS_WEIGHTS = args.class_weights
     USE_INFER = args.use_infer
     L1_WEIGHT = args.l1_weight
+    DROPOUT = args.dropout
+    ATTN_DROP = args.attn_drop
     
     exp_dir = os.path.join(OUT_PATH, args.log_name)  # 实验输出目录
     if not os.path.exists(exp_dir):
@@ -473,6 +465,8 @@ if __name__ == '__main__':
     logging.info('Use infered train nodes: {}'.format(USE_INFER))
     logging.info("L1 loss weight: {}".format(L1_WEIGHT))
     logging.info('Output path: {}'.format(OUT_PATH))
+    logging.info("Dropout of features: {}".format(DROPOUT))
+    logging.info("Attention Dropout: {}".format(ATTN_DROP))
 
     # Retrieve preprocessed data and add reverse edge and self-loop
     graph, labels, train_nid, val_nid, test_nid, node_feat = load_dgl_graph(BASE_PATH)
@@ -517,7 +511,7 @@ if __name__ == '__main__':
                       graph_data=(graph, labels, train_nid, val_nid, test_nid, node_feat),
                       gnn_model=MODEL_CHOICE, hidden_dim=HID_DIM, n_layers=N_LAYERS, n_classes=23,
                       fanouts=FANOUTS, batch_size=BATCH_SIZE, num_workers=WORKERS, epochs=EPOCHS, accumulation=ACCUMULATION,
-                      message_queue=None, weights=weights if CLASS_WEIGHTS else None, l1_weight=L1_WEIGHT, output_folder=exp_dir)
+                      message_queue=None, weights=weights if CLASS_WEIGHTS else None, l1_weight=L1_WEIGHT, dropout=DROPOUT, attn_drop=ATTN_DROP, output_folder=exp_dir)
         else:
             message_queue = mp.Queue()
             procs = []
@@ -527,7 +521,7 @@ if __name__ == '__main__':
                                      (graph, labels, train_nid, val_nid, test_nid, node_feat),
                                      MODEL_CHOICE, HID_DIM, N_LAYERS, 23,
                                      FANOUTS, BATCH_SIZE, WORKERS, EPOCHS, ACCUMULATION,
-                                     message_queue, weights if CLASS_WEIGHTS else None, L1_WEIGHT, exp_dir))
+                                     message_queue, weights if CLASS_WEIGHTS else None, L1_WEIGHT, DROPOUT, ATTN_DROP, exp_dir))
                 p.start()
                 procs.append(p)
             for p in procs:
